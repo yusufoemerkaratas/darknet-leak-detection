@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:15
+    container_name: pp_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: mydb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: .
+    container_name: pp_backend
+    restart: always
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    image: node:20-alpine
+    container_name: pp_frontend
+    working_dir: /app
+    volumes:
+      - ../frontend:/app
+    command: sh -c "echo 'Frontend placeholder service for Sprint 1' && sleep infinity"
+    ports:
+      - "3000:3000"
+    profiles:
+      - frontend
+
+volumes:
+  postgres_data:
