@@ -17,7 +17,7 @@ class TorManager:
     Tor ağı entegrasyonu - anonim web istekleri için
     """
 
-    def __init__(self, socks_port=9050, control_port=9051, control_password=None):
+    def __init__(self, socks_port=9050, control_port=9051, control_password=None, rotate_every=50):
         """
         Initialize TorManager
 
@@ -25,10 +25,13 @@ class TorManager:
             socks_port: SOCKS proxy port (default: 9050)
             control_port: Tor control port (default: 9051)
             control_password: Tor control port password (optional, for HashedControlPassword)
+            rotate_every: Auto-rotate circuit after this many requests (default: 50)
         """
         self.socks_port = socks_port
         self.control_port = control_port
         self.control_password = control_password
+        self.rotate_every = rotate_every
+        self._request_count = 0
         self.controller = None
         self.session = None
 
@@ -37,8 +40,8 @@ class TorManager:
 
     def _connect_to_tor(self):
         """
-        Connect to Tor control port
-        Tor kontrol portuna bağlan
+        Connect to Tor control port. Raises if Tor is not reachable.
+        Tor kontrol portuna bağlan.
         """
         try:
             self.controller = Controller.from_port(port=self.control_port)
@@ -47,6 +50,41 @@ class TorManager:
         except Exception as e:
             logger.error(f"✗ Failed to connect to Tor: {e}")
             raise
+
+    def _reconnect(self, max_attempts=3):
+        """
+        Reconnect to Tor control port after a connection drop.
+        Bağlantı kopunca yeniden bağlan.
+
+        Returns:
+            bool: True if reconnected successfully
+        """
+        for attempt in range(1, max_attempts + 1):
+            try:
+                logger.info(f"Reconnecting to Tor (attempt {attempt}/{max_attempts})...")
+                if self.controller:
+                    try:
+                        self.controller.close()
+                    except Exception:
+                        pass
+                self._connect_to_tor()
+                if self.session:
+                    self.session.close()
+                self._setup_session()
+                logger.info("✓ Reconnected to Tor")
+                return True
+            except Exception as e:
+                logger.warning(f"Reconnect attempt {attempt} failed: {e}")
+                time.sleep(3 * attempt)
+        logger.error("✗ Could not reconnect to Tor after all attempts")
+        return False
+
+    def _is_connected(self):
+        """Check if controller connection is still alive."""
+        try:
+            return self.controller is not None and self.controller.is_alive()
+        except Exception:
+            return False
 
     def _setup_session(self):
         """
@@ -66,57 +104,82 @@ class TorManager:
         })
         self.session.verify = certifi.where()
     
-    def verify_tor(self):
+    def _current_ip(self):
         """
-        Verify Tor connection by checking current IP
-        Tor bağlantısını doğrula - mevcut IP'yi kontrol et
-        
-        Returns:
-            str: Current IP address (Tor exit node IP)
+        Return current exit node IP without logging or side-effects.
+        Mevcut exit node IP'sini döndür (loglama olmadan).
         """
         try:
             response = self.session.get(
                 'https://api.ipify.org?format=json',
                 timeout=10
             )
-            data = response.json()
-            current_ip = data['ip']
-            logger.info(f"✓ Current IP (via Tor): {current_ip}")
-            return current_ip
-        except Exception as e:
-            logger.error(f"✗ Failed to verify Tor: {e}")
+            return response.json().get('ip')
+        except Exception:
             return None
-    
-    def get_new_circuit(self):
+
+    def verify_tor(self):
         """
-        Request new Tor circuit (change exit node)
-        Yeni Tor circuit oluştur (exit node değiştir)
+        Verify Tor connection by checking current IP.
+        Tor bağlantısını doğrula - mevcut IP'yi kontrol et.
+
+        Returns:
+            str: Current IP address (Tor exit node IP)
+        """
+        ip = self._current_ip()
+        if ip:
+            logger.info(f"✓ Current IP (via Tor): {ip}")
+        else:
+            logger.error("✗ Failed to verify Tor")
+        return ip
+
+    def _do_newnym(self):
+        """Send NEWNYM and rebuild session. Does NOT verify IP change."""
+        wait_time = self.controller.get_newnym_wait()
+        if wait_time > 0:
+            logger.info(f"Waiting {wait_time:.1f}s before requesting new circuit...")
+            time.sleep(wait_time)
+        self.controller.signal(Signal.NEWNYM)
+        if self.session:
+            self.session.close()
+        self._setup_session()
+        time.sleep(2)
+
+    def get_new_circuit(self, max_attempts=3):
+        """
+        Request a new Tor circuit and verify the exit node IP actually changed.
+        Retries up to max_attempts times if the same exit node is selected.
+
+        Yeni Tor circuit oluştur ve exit node IP'sinin gerçekten değiştiğini doğrula.
+        Aynı exit node seçilirse max_attempts kadar tekrar dener.
+
+        Args:
+            max_attempts: Maximum rotation attempts (default: 3)
         """
         if self.controller is None:
             logger.error("✗ Controller not connected")
-            return
-        try:
-            # Rate-limit: Tor allows NEWNYM at most once every ~10s
-            wait_time = self.controller.get_newnym_wait()
-            if wait_time > 0:
-                logger.info(f"Waiting {wait_time:.1f}s before requesting new circuit...")
-                time.sleep(wait_time)
+            return False
 
-            self.controller.signal(Signal.NEWNYM)
+        old_ip = self._current_ip()
 
-            # Close existing session to drop all Keep-Alive connections —
-            # otherwise requests reuse the old TCP connection to the SOCKS
-            # proxy and end up on the same exit node despite the new circuit.
-            if self.session:
-                self.session.close()
-            self._setup_session()
+        for attempt in range(1, max_attempts + 1):
+            try:
+                self._do_newnym()
+                new_ip = self._current_ip()
 
-            # Give Tor ~2s to finish building the new circuit
-            time.sleep(2)
+                if new_ip and new_ip != old_ip:
+                    logger.info(f"✓ Exit node changed: {old_ip} → {new_ip}")
+                    return True
 
-            logger.info("✓ New Tor circuit established")
-        except Exception as e:
-            logger.error(f"✗ Failed to rotate circuit: {e}")
+                logger.warning(
+                    f"Same exit node on attempt {attempt}/{max_attempts} "
+                    f"(IP: {new_ip}), retrying..."
+                )
+            except Exception as e:
+                logger.error(f"✗ Circuit rotation attempt {attempt} failed: {e}")
+
+        logger.warning("Could not guarantee exit node change after all attempts")
+        return False
 
     def get_circuit_info(self):
         """
@@ -136,21 +199,35 @@ class TorManager:
         except Exception as e:
             logger.error(f"Error getting circuit info: {e}")
     
+    def _tick(self):
+        """
+        Increment request counter and auto-rotate circuit every `rotate_every` requests.
+        Request sayacını artır, eşiğe ulaşınca circuit'i otomatik rotate et.
+        """
+        self._request_count += 1
+        if self._request_count % self.rotate_every == 0:
+            logger.info(f"Auto-rotating circuit after {self._request_count} requests...")
+            self.get_new_circuit()
+
     def fetch(self, url, timeout=15, max_retries=3):
         """
         Fetch URL content through Tor
         Tor üzerinden URL'den veri çek
-        
+
         Args:
             url: Target URL
             timeout: Request timeout in seconds (default: 15)
             max_retries: Max retry attempts (default: 3)
-        
+
         Returns:
             requests.Response: Response object or None if failed
         """
+        if not self._is_connected() and not self._reconnect():
+            return None
+
         for attempt in range(max_retries):
             try:
+                self._tick()
                 response = self.session.get(url, timeout=timeout)
                 response.raise_for_status()
                 logger.info(f"✓ Fetched {url} (Status: {response.status_code})")
@@ -166,28 +243,36 @@ class TorManager:
             except requests.exceptions.ConnectionError as e:
                 logger.warning(f"Connection error on attempt {attempt + 1}/{max_retries}: {e}")
                 if attempt < max_retries - 1:
-                    self.get_new_circuit()
+                    if not self._is_connected():
+                        if not self._reconnect():
+                            return None
+                    else:
+                        self.get_new_circuit()
             except Exception as e:
                 logger.error(f"Error fetching {url}: {e}")
                 return None
-        
+
         logger.error(f"✗ Failed to fetch {url} after {max_retries} attempts")
         return None
-    
+
     def post(self, url, data=None, timeout=15):
         """
         Send POST request through Tor
         Tor üzerinden POST isteği gönder
-        
+
         Args:
             url: Target URL
             data: POST data dictionary
             timeout: Request timeout in seconds
-        
+
         Returns:
             requests.Response: Response object or None if failed
         """
+        if not self._is_connected() and not self._reconnect():
+            return None
+
         try:
+            self._tick()
             response = self.session.post(url, data=data, timeout=timeout)
             response.raise_for_status()
             return response
@@ -197,13 +282,15 @@ class TorManager:
     
     def close(self):
         """
-        Close Tor connection
-        Tor bağlantısını kapat
+        Close Tor connection and HTTP session.
+        Tor bağlantısını ve HTTP session'ı kapat.
         """
         try:
+            if self.session:
+                self.session.close()
             if self.controller:
                 self.controller.close()
-                logger.info("✓ Closed Tor connection")
+            logger.info("✓ Closed Tor connection")
         except Exception as e:
             logger.error(f"Error closing connection: {e}")
 
