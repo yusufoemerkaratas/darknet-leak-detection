@@ -1,0 +1,10 @@
+requests
+requests[socks]
+beautifulsoup4
+lxml
+scrapy
+selenium
+playwright
+pandas
+stem
+PySocks
