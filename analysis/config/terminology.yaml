@@ -1,0 +1,99 @@
+metadata:
+  version: "1.0"
+  total_terms: 16
+  precision_target: 0.80
+  last_updated: "2026-04-09"
+
+terminology:
+
+  high_priority:
+    description: >
+      Terms that strongly indicate a genuine data leak or security incident.
+      Presence of any high-priority term contributes +15 to the risk score.
+    score_contribution: 15
+    terms:
+
+      - term: "combo list"
+        description: "Collections of username and password or email and password pairs typically sold or distributed on darknet markets"
+        example: "fresh combo list 50k accounts available for download"
+
+      - term: "database dump"
+        description: "Explicit export of a full or partial relational database, often including user tables, credentials or financial records"
+        example: "full database dump available, users table included, 2023 backup"
+
+      - term: "leaked"
+        description: "Explicit claim that data has been exposed or published without authorisation"
+        example: "leaked employee records from Q3, internal use only"
+
+      - term: "breach"
+        description: "Reference to a confirmed or claimed security incident resulting in unauthorised data access"
+        example: "major breach confirmed, 2 million records affected"
+
+      - term: "credentials"
+        description: "Explicit mention of authentication data such as usernames, passwords or session tokens"
+        example: "valid credentials still active, tested and working"
+
+      - term: "access"
+        description: "Claimed unauthorised or privileged access to a system, server or network resource"
+        example: "root access to internal servers, persistent backdoor installed"
+
+      - term: "shell"
+        description: "Claimed web shell upload or remote command execution capability on a compromised server"
+        example: "php shell uploaded, full control of the web server confirmed"
+
+  medium_priority:
+    description: >
+      Terms that are context-dependent and may indicate a leak
+      when combined with other signals. Each match contributes
+      +10 to the risk score.
+    score_contribution: 10
+    terms:
+
+      - term: "source code"
+        description: "Reference to internal or proprietary source code being exposed or distributed"
+        example: "internal source code repository dumped, includes authentication module"
+
+      - term: "client list"
+        description: "Exposure of customer or client data including names, contacts or account details"
+        example: "full client list with email addresses and phone numbers attached"
+
+      - term: "user data"
+        description: "Generic reference to user information that may include personally identifiable data"
+        example: "user data from 2023 registration database available"
+
+      - term: "transaction"
+        description: "Reference to financial or system transaction records that may reveal sensitive activity"
+        example: "transaction history exported directly from the payment processing system"
+
+      - term: "private"
+        description: "Reference to private or internal information not intended for public distribution"
+        example: "private internal documents shared without authorisation"
+
+  low_priority:
+    description: >
+      Terms that may appear in legitimate non-malicious contexts and carry
+      a high false-positive risk. A match contributes +5 to the risk score
+      only when at least one medium or high priority signal is also present.
+    score_contribution: 5
+    conditional: true
+    terms:
+
+      - term: "secret"
+        description: "Ambiguous term that may refer to actual confidential data or be used in ordinary marketing language"
+        false_positive_example: "our secret summer sale event starts Monday"
+        leak_example: "secret pricing list for enterprise clients only"
+
+      - term: "exclusive"
+        description: "Ambiguous term commonly used in marketing that may occasionally signal restricted data being offered"
+        false_positive_example: "exclusive VPN deal for new subscribers this week"
+        leak_example: "exclusive access to internal admin tools, unpatched version"
+
+      - term: "log"
+        description: "May refer to system logs containing sensitive operational data or simply to routine activity records"
+        false_positive_example: "daily activity log updated every evening"
+        leak_example: "auth.log exported directly from the production server"
+
+      - term: "dump"
+        description: "May indicate a database or memory dump containing sensitive data or refer to unrelated disposal activity"
+        false_positive_example: "trash dump location changed this week"
+        leak_example: "memory dump from live authentication server attached"
