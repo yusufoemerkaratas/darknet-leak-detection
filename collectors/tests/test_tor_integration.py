@@ -1,15 +1,19 @@
-# test_tor.py
+# collectors/tests/test_tor_integration.py
+#
+# Integration test — requires a running Tor service (port 9050/9051).
+# Run from project root:
+#   venv/bin/python collectors/tests/test_tor_integration.py
 
-from collectors.tor_manager import TorManager
+import sys
 import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from tor_manager import TorManager
 
 
 def main():
-    """
-    Test Tor integration
-    Tor entegrasyonunu test et
-    """
-
     print("\n" + "=" * 60)
     print("TOR INTEGRATION TEST")
     print("=" * 60)
@@ -49,11 +53,10 @@ def main():
 
         # Step 5: Test POST request
         print("\n5️⃣  Testing POST request...")
-        post_data = {
-            'test': 'data',
-            'timestamp': int(time.time())
-        }
-        post_response = tor.post("https://httpbin.org/post", data=post_data)
+        post_response = tor.post(
+            "https://httpbin.org/post",
+            data={"test": "data", "timestamp": int(time.time())},
+        )
         if post_response:
             print(f"   ✓ POST Status: {post_response.status_code}")
         else:
@@ -73,9 +76,7 @@ def main():
         else:
             print("   ✗ Could not change exit node after retries")
 
-        # Step 8: Auto-rotation test
-        # TorManager with rotate_every=3: after 3 fetch calls the circuit
-        # rotates automatically and the new exit node IP must differ.
+        # Step 8: Auto-rotation test (rotate_every=3)
         print("\n8️⃣  Testing auto-rotation (rotate_every=3)...")
         tor_auto = TorManager(socks_port=9050, control_port=9051, rotate_every=3)
         ip_before = tor_auto.verify_tor()
@@ -87,16 +88,13 @@ def main():
 
         ip_after = tor_auto.verify_tor()
         print(f"   IP after auto-rotate:  {ip_after}")
-        auto_triggered = tor_auto._request_count >= 3
-        ip_changed = ip_before != ip_after
-        print(f"   ✓ Auto-rotation triggered: {auto_triggered}")
-        if ip_changed:
+        print(f"   ✓ Auto-rotation triggered: {tor_auto._request_count >= 3}")
+        if ip_before != ip_after:
             print(f"   ✓ IP changed: {ip_before} → {ip_after}")
         else:
-            print(f"   ✗ IP did not change after auto-rotation")
+            print("   ✗ IP did not change after auto-rotation")
         tor_auto.close()
 
-        # Summary
         print("\n" + "=" * 60)
         print("✅ ALL TESTS COMPLETED SUCCESSFULLY")
         print("=" * 60 + "\n")
