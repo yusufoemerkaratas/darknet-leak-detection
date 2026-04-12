@@ -9,6 +9,8 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+# Suppress stem's noisy SocketClosed warnings from the background reader thread
+logging.getLogger("stem").setLevel(logging.ERROR)
 
 
 class TorManager:
