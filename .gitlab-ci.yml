@@ -59,16 +59,20 @@ build:backend:
   image: docker:24
   services:
     - docker:24-dind
-  before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-    - docker build -t $IMAGE_NAME:$IMAGE_TAG -t $IMAGE_NAME:latest ./backend
-    - docker push $IMAGE_NAME:$IMAGE_TAG
-    - docker push $IMAGE_NAME:latest
+    - docker build -t $IMAGE_NAME:$IMAGE_TAG ./backend
+    - |
+      if [ "$CI_COMMIT_BRANCH" == "main" ]; then
+        docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+        docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
+        docker push $IMAGE_NAME:$IMAGE_TAG
+        docker push $IMAGE_NAME:latest
+      else
+        echo "Feature branch — build OK, skipping push"
+      fi
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
-      when: manual
-    - when: never
+    - if: $CI_COMMIT_BRANCH == "feature/forum-collectors"
 
 # ─── DEPLOY ───────────────────────────────────────────────────────────────────
 
