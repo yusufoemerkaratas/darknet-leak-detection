@@ -51,7 +51,7 @@ test:backend:
 # ─── BUILD ────────────────────────────────────────────────────────────────────
 
 # Requires privileged mode in GitLab Runner config.toml:
- build:backend:
+build:backend:
   stage: build
   image: docker:24
   before_script: []
