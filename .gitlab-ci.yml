@@ -51,9 +51,7 @@ test:backend:
 # ─── BUILD ────────────────────────────────────────────────────────────────────
 
 # Requires privileged mode in GitLab Runner config.toml:
-#   [runners.docker]
-#     privileged = true
-build:backend:
+# build:backend:
   stage: build
   image: docker:24
   before_script: []
@@ -76,8 +74,6 @@ build:backend:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "feature/forum-collectors"
-# ─── DEPLOY ───────────────────────────────────────────────────────────────────
-
 # Manual trigger on main — SSH into server, pull latest image, restart backend
 deploy:production:
   stage: deploy
@@ -100,6 +96,8 @@ deploy:production:
     url: http://$DEPLOY_HOST:8000
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
+      when: manual
+    - if: $CI_COMMIT_BRANCH == "feature/forum-collectors"
       when: manual
   needs:
     - build:backend
