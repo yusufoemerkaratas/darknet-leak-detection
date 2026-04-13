@@ -67,7 +67,8 @@ build:backend:
     - docker push $IMAGE_NAME:latest
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_COMMIT_BRANCH == "feature/forum-collectors"
+      when: manual
+    - when: never
 
 # ─── DEPLOY ───────────────────────────────────────────────────────────────────
 
