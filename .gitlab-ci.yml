@@ -57,6 +57,7 @@ test:backend:
 build:backend:
   stage: build
   image: docker:24
+  before_script: []
   services:
     - docker:24-dind
   script:
