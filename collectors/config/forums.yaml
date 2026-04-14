@@ -1,0 +1,185 @@
+# collectors/config/forums.yaml
+#
+# Forum configurations for the darknet leak collector.
+# Credentials are never stored here — reference ${ENV_VAR} placeholders only.
+# Set actual values in collectors/.env (copy from .env.example).
+
+forums:
+
+  - id: breachforums
+    name: "BreachForums"
+    enabled: true
+    base_url: "http://breachforums3bc7dsc3wfp34dzjzlecsogfstfytndkpjqmam45gb5jyd.onion"
+    clearnet_url: "https://breachforums.st"
+
+    auth:
+      type: form                         # form | cookie | none
+      login_url: "/login"
+      login_method: POST
+      fields:
+        username: "${BREACHFORUMS_USER}"
+        password: "${BREACHFORUMS_PASS}"
+        csrf_field: "csrf_token"         # collector fetches it from login page
+      success_indicator: "logout"
+      session_cookie_name: "xf_session"
+      cookie_file: "cookies/breachforums.json"
+      session_ttl: 3600                  # seconds before forced re-login
+
+    account_generation:
+      enabled: true
+      register_url: "/register"
+      register_method: POST
+      fields:
+        username: "{generated_username}"
+        password: "{generated_password}"
+        email: "{generated_email}"
+        agree_tos: "1"
+      captcha: none                      # none | recaptcha | hcaptcha | image
+      credentials_file: "accounts/breachforums.json"
+
+    sections:
+      - name: "Databases & Leaks"
+        url: "/Forum-Databases-Leaks"
+        enabled: true
+      - name: "Combolists"
+        url: "/Forum-Combolists"
+        enabled: true
+
+    selectors:
+      post_list: "div.structItem--thread"
+      post_item: "div.structItem--thread"
+      title: "div.structItem-title a[data-tp-primary]"
+      author: "a.username"
+      timestamp: "time[datetime]"
+      timestamp_attr: "datetime"
+      body: "div.bbWrapper"
+      category: "ul.structItem-parts li a"
+      next_page: "a.pageNavSimple-el--next"
+      thread_body: "article.message-body div.bbWrapper"
+      thread_author: "a.username--staff"
+      reply_count: "dl.pairs--justified dd"
+
+    rate_limit:
+      min_delay: 2.0
+      max_delay: 6.0
+      max_requests_per_hour: 120
+      backoff_on_429: 60
+
+  - id: xss_forum
+    name: "XSS.is"
+    enabled: true
+    base_url: "http://xssforumv3isucukbxhdhwz67hoa5e2voakcfkuieq4ch257vsburuid.onion"
+    clearnet_url: "https://xss.is"
+
+    auth:
+      type: form
+      login_url: "/login"
+      login_method: POST
+      fields:
+        login: "${XSSFORUM_USER}"
+        password: "${XSSFORUM_PASS}"
+        csrf_field: "_xfToken"
+      success_indicator: "выход"
+      session_cookie_name: "xf_session"
+      cookie_file: "cookies/xss_forum.json"
+      session_ttl: 7200
+
+    account_generation:
+      enabled: true
+      register_url: "/register"
+      register_method: POST
+      fields:
+        username: "{generated_username}"
+        password: "{generated_password}"
+        email: "{generated_email}"
+        agree_tos: "1"
+      captcha: none
+      credentials_file: "accounts/xss_forum.json"
+
+    sections:
+      - name: "Databases"
+        url: "/forums/51/"
+        enabled: true
+      - name: "Leaks"
+        url: "/forums/88/"
+        enabled: true
+
+    selectors:
+      post_list: "div.structItem--thread"
+      post_item: "div.structItem--thread"
+      title: "div.structItem-title a"
+      author: "a.username"
+      timestamp: "time[datetime]"
+      timestamp_attr: "datetime"
+      body: "div.bbWrapper"
+      category: "nav.breadcrumb span"
+      next_page: "a.pageNavSimple-el--next"
+      thread_body: "article.message-body div.bbWrapper"
+      thread_author: "a.username"
+      reply_count: "div.structItem-minor span"
+
+    rate_limit:
+      min_delay: 3.0
+      max_delay: 8.0
+      max_requests_per_hour: 90
+      backoff_on_429: 90
+
+  - id: exploit_in
+    name: "Exploit.in"
+    enabled: true
+    base_url: "http://exploitivzcm5dawzhe6c32f3zamswkpbu2vu3szfk2dcoq4qms2oad.onion"
+    clearnet_url: "https://exploit.in"
+
+    auth:
+      type: form
+      login_url: "/login"
+      login_method: POST
+      fields:
+        login: "${EXPLOITIN_USER}"
+        password: "${EXPLOITIN_PASS}"
+        csrf_field: "csrf_token"
+      success_indicator: "logout"
+      session_cookie_name: "PHPSESSID"
+      cookie_file: "cookies/exploit_in.json"
+      session_ttl: 3600
+
+    account_generation:
+      enabled: false            # invite-only
+      credentials_file: "accounts/exploit_in.json"
+
+    sections:
+      - name: "Leaks"
+        url: "/forum/91-leaks/"
+        enabled: true
+      - name: "Databases"
+        url: "/forum/50-databases/"
+        enabled: true
+
+    selectors:
+      post_list: "li.ipsDataItem"
+      post_item: "li.ipsDataItem"
+      title: "span.ipsType_break a"
+      author: "a[hreflang]"
+      timestamp: "time"
+      timestamp_attr: "datetime"
+      body: "div.ipsType_richText"
+      category: "span.ipsType_light a"
+      next_page: "li.ipsPagination_next a"
+      thread_body: "div.ipsType_richText"
+      thread_author: "a.ipsType_break"
+      reply_count: "li.ipsPagination_last"
+
+    rate_limit:
+      min_delay: 4.0
+      max_delay: 10.0
+      max_requests_per_hour: 60
+      backoff_on_429: 120
+
+defaults:
+  request_timeout: 30
+  max_retries: 3
+  rotate_circuit_every: 50
+  user_agent_rotate: true
+  respect_robots_txt: false
+  max_pages_per_section: 10
+  storage_dir: "raw_storage"
