@@ -1,0 +1,135 @@
+metadata:
+  version: "1.0"
+  total_patterns: 15
+  precision_target: 0.80
+  last_updated: "2026-04-18"
+
+patterns:
+
+  # ── Credential Patterns ────────────────────────────────────────────
+
+  - pattern_type: email_password_colon
+    regex: '[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}:[^\s:]{6,}'
+    confidence: 0.95
+    description: >
+      Detects email:password pairs separated by a colon.
+      Common format in combo lists and credential dumps.
+
+  - pattern_type: email_password_pipe
+    regex: '[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\|[^\s|]{6,}'
+    confidence: 0.95
+    description: >
+      Detects email|password pairs separated by a pipe character.
+      Alternative separator format found in some credential dumps.
+
+  - pattern_type: email_password_double_colon
+    regex: '[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}::[^\s:]{6,}'
+    confidence: 0.90
+    description: >
+      Detects email::password pairs separated by a double colon.
+      Less common format occasionally seen in paste-site leaks.
+
+  # ── Username and Hash Patterns ─────────────────────────────────────
+
+  - pattern_type: username_md5
+    regex: '\b\w+:[a-fA-F0-9]{32}\b'
+    confidence: 0.90
+    description: >
+      Detects username:hash pairs where the hash is a 32-character
+      hexadecimal string consistent with MD5.
+
+  - pattern_type: username_sha1
+    regex: '\b\w+:[a-fA-F0-9]{40}\b'
+    confidence: 0.90
+    description: >
+      Detects username:hash pairs where the hash is a 40-character
+      hexadecimal string consistent with SHA-1.
+
+  - pattern_type: username_bcrypt
+    regex: '\b\w+:\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}'
+    confidence: 0.92
+    description: >
+      Detects username:hash pairs where the hash follows the bcrypt
+      format ($2a$, $2b$, or $2y$ prefix).
+
+  # ── Database Dump Patterns ─────────────────────────────────────────
+
+  - pattern_type: database_dump
+    regex: '(INSERT\s+INTO\s+\w+|CREATE\s+TABLE\s+\w+|VALUES\s*\()'
+    confidence: 0.85
+    case_insensitive: true
+    description: >
+      Detects SQL database dump statements such as INSERT INTO
+      or CREATE TABLE, indicating exported database content.
+
+  # ── Private Key Patterns ───────────────────────────────────────────
+
+  - pattern_type: rsa_private_key
+    regex: '-----BEGIN RSA PRIVATE KEY-----[\s\S]+?-----END RSA PRIVATE KEY-----'
+    confidence: 0.99
+    description: >
+      Detects PEM-encoded RSA private key blocks.
+      Very high confidence as the delimiters are unique.
+
+  - pattern_type: openssh_private_key
+    regex: '-----BEGIN OPENSSH PRIVATE KEY-----[\s\S]+?-----END OPENSSH PRIVATE KEY-----'
+    confidence: 0.99
+    description: >
+      Detects PEM-encoded OpenSSH private key blocks.
+      Very high confidence as the delimiters are unique.
+
+  - pattern_type: pgp_private_key
+    regex: '-----BEGIN PGP PRIVATE KEY BLOCK-----[\s\S]+?-----END PGP PRIVATE KEY BLOCK-----'
+    confidence: 0.99
+    description: >
+      Detects ASCII-armored PGP private key blocks.
+      Very high confidence as the delimiters are unique.
+
+  # ── API Key Patterns ───────────────────────────────────────────────
+
+  - pattern_type: aws_api_key
+    regex: 'AKIA[0-9A-Z]{16}'
+    confidence: 0.97
+    description: >
+      Detects AWS access key IDs which begin with the prefix AKIA
+      followed by exactly 16 uppercase alphanumeric characters.
+
+  - pattern_type: stripe_api_key
+    regex: 'sk_live_[a-zA-Z0-9]{24,}'
+    confidence: 0.97
+    description: >
+      Detects Stripe live secret API keys which begin with sk_live_
+      followed by at least 24 alphanumeric characters.
+
+  - pattern_type: github_token
+    regex: 'ghp_[a-zA-Z0-9]{36}'
+    confidence: 0.97
+    description: >
+      Detects GitHub personal access tokens which begin with ghp_
+      followed by exactly 36 alphanumeric characters.
+
+  # ── Configuration File Patterns ────────────────────────────────────
+
+  - pattern_type: config_db_password
+    regex: 'DB_PASSWORD\s*=\s*[^\s]+'
+    confidence: 0.80
+    case_insensitive: true
+    description: >
+      Detects database password assignments in configuration files
+      or environment variable definitions (DB_PASSWORD=...).
+
+  - pattern_type: config_api_key
+    regex: 'API_KEY\s*=\s*[^\s]+'
+    confidence: 0.80
+    case_insensitive: true
+    description: >
+      Detects API key assignments in configuration files
+      or environment variable definitions (API_KEY=...).
+
+  - pattern_type: config_secret_token
+    regex: 'SECRET_TOKEN\s*=\s*[^\s]+'
+    confidence: 0.80
+    case_insensitive: true
+    description: >
+      Detects secret token assignments in configuration files
+      or environment variable definitions (SECRET_TOKEN=...).
