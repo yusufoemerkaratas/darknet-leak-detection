@@ -97,3 +97,22 @@ terminology:
         description: "May indicate a database or memory dump containing sensitive data or refer to unrelated disposal activity"
         false_positive_example: "trash dump location changed this week"
         leak_example: "memory dump from live authentication server attached"
+
+  industry_indicator:
+    description: >
+      Terms indicating the targeted industry sector. These provide critical context 
+      for assessing the impact and regulatory implications (e.g., GDPR, HIPAA) of a leak.
+    score_contribution: 5
+    terms:
+
+      - term: "healthcare"
+        description: "References to medical, hospital, or patient data sectors"
+        example: "healthcare database dump containing patient records available"
+
+      - term: "financial"
+        description: "References to banking, investment, or general financial sectors"
+        example: "financial transaction logs leaked from the main server"
+
+      - term: "government"
+        description: "References to public sector, state, or federal entities"
+        example: "government employee credentials exposed in recent breach"

@@ -6,18 +6,40 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from dateutil import parser as date_parser
+import yaml
 
 # Add parent directory to sys.path to import backend modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.db import SessionLocal
-from backend.models import LeakRecord, Source, Company
+from backend.models import AnalysisResult, LeakRecord, Source, Company
+from analysis.detectors.credential_detector import CredentialDetector
+from analysis.detectors.terminology_detector import TerminologyDetector
+from analysis.detectors.company_detector import CompanyDetector
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 RAW_STORAGE_DIR = Path(__file__).parent / "raw_storage"
 PROCESSED_STORAGE_DIR = Path(__file__).parent / "processed_storage"
+COMPANY_PROFILE_PATH = Path(__file__).resolve().parent.parent / "analysis" / "config" / "company_profiles.yaml"
+
+_credential_detector = CredentialDetector()
+_terminology_detector = TerminologyDetector()
+_company_detector = None
+
+def _load_company_profiles() -> list:
+    if not COMPANY_PROFILE_PATH.exists():
+        return []
+
+    try:
+        with open(COMPANY_PROFILE_PATH, "r", encoding="utf-8") as fh:
+            config = yaml.safe_load(fh) or {}
+        return config.get("companies", [])
+    except Exception:
+        return []
+
+_company_detector = CompanyDetector(_load_company_profiles())
 
 def get_or_create_source(db, forum_id: str, forum_name: str, source_url: str) -> Source:
     source = db.query(Source).filter(Source.name == forum_id).first()
@@ -62,6 +84,52 @@ def parse_date(date_str: str) -> datetime:
     except Exception:
         return datetime.utcnow()
 
+def _build_analysis_text(doc: dict) -> str:
+    parts = [
+        doc.get("title", ""),
+        doc.get("body", ""),
+        doc.get("body_preview", ""),
+        doc.get("content", ""),
+    ]
+    return "\n".join(p for p in parts if p)
+
+def _serialize_detection_results(text: str) -> dict:
+    patterns = []
+    for result in _credential_detector.detect(text):
+        patterns.append({
+            "pattern_type": result.pattern_type,
+            "matched_text": result.matched_text,
+            "context": result.context,
+            "confidence": result.confidence,
+            "line_number": result.line_number,
+        })
+
+    terminology = []
+    for result in _terminology_detector.detect(text):
+        terminology.append({
+            "term": result.term,
+            "priority": result.priority,
+            "count": result.count,
+            "line_numbers": result.line_numbers,
+            "context": result.context,
+        })
+
+    company_indicators = []
+    for result in _company_detector.detect(text):
+        company_indicators.append({
+            "company_name": result.company_name,
+            "match_type": result.match_type,
+            "matched_term": result.matched_term,
+            "confidence": result.confidence,
+            "similarity_score": result.similarity_score,
+        })
+
+    return {
+        "patterns": patterns,
+        "terminology": terminology,
+        "company_indicators": company_indicators,
+    }
+
 def process_file(db, filepath: Path) -> bool:
     try:
         with open(filepath, "r", encoding="utf-8") as f:
@@ -95,8 +163,18 @@ def process_file(db, filepath: Path) -> bool:
             published_at=published_at,
             collected_at=collected_at
         )
-        
         db.add(record)
+        db.commit()
+        db.refresh(record)
+
+        analysis_text = _build_analysis_text(doc)
+        detected = _serialize_detection_results(analysis_text)
+
+        analysis_result = AnalysisResult(
+            leak_record_id=record.id,
+            detected_patterns=detected,
+        )
+        db.add(analysis_result)
         db.commit()
         return True
     

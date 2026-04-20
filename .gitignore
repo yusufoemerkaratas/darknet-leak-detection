@@ -31,3 +31,6 @@ pnpm-debug.log*
 dist/
 build/
 coverage/
+
+# Collector outputs
+collectors/processed_storage/
