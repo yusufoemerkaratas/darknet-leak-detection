@@ -21,6 +21,7 @@ pandas==3.0.2
 # Utilities
 Faker==40.13.0
 PyYAML==6.0.3
+python-Levenshtein==0.27.1
 python-dotenv==1.2.2
 python-dateutil==2.9.0
 schedule==1.2.2
