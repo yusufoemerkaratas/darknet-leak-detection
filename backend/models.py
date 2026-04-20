@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, JSON
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
 
@@ -44,3 +44,15 @@ class LeakRecord(Base):
 
     source = relationship("Source", back_populates="leak_records")
     company = relationship("Company", back_populates="leak_records")
+    analysis_result = relationship("AnalysisResult", back_populates="leak_record", uselist=False, cascade="all, delete-orphan")
+
+
+class AnalysisResult(Base):
+    __tablename__ = "analysis_result"
+
+    id = Column(Integer, primary_key=True, index=True)
+    leak_record_id = Column(Integer, ForeignKey("leak_records.id", ondelete="CASCADE"), nullable=False, unique=True)
+    detected_patterns = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    leak_record = relationship("LeakRecord", back_populates="analysis_result")
