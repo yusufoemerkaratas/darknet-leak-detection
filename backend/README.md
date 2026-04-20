@@ -32,6 +32,16 @@ backend/
 uvicorn main:app --reload
 ```
 
+Make sure the repo-root `.env` exists (copy from `.env.example`).
+
+### One-command dev startup (Linux/macOS)
+
+From the repo root:
+
+```bash
+./scripts/dev.sh
+```
+
 ---
 
 ## 🐳 Run with Docker
@@ -47,6 +57,13 @@ docker compose up --build
 ```bash
 alembic revision --autogenerate -m "init"
 alembic upgrade head
+```
+
+If you run Alembic on the host (not inside Docker), set `DATABASE_URL`
+to `localhost` so it can reach the Postgres container:
+
+```bash
+DATABASE_URL=postgresql+psycopg2://postgres:password@localhost:5432/mydb alembic current
 ```
 
 ---
