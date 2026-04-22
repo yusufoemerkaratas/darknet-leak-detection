@@ -39,7 +39,7 @@ _SIZE_RE = re.compile(
 
 # Expressions like "X records", "X rows", "X lines" at the start of the line
 _RECORD_COUNT_RE = re.compile(
-    r'([\d,\.]+)\s*(?:million|mln|M)?\s*(?:records?|rows?|lines?|entries|kullanıcı)',
+    r'([\d,\.]+)\s*(?:million|mln|M)?\s*(?:records?|rows?|lines?|entries|user)',
     re.IGNORECASE,
 )
 

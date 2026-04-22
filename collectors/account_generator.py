@@ -205,17 +205,17 @@ class AccountRegistrar:
 
     def _solve_captcha(self, register_page_soup: BeautifulSoup) -> Optional[dict]:
         """
-        Kayıt sayfasındaki CAPTCHA'yı tespit et ve çöz.
+        Detect and solve CAPTCHA on the registration page.
 
-        Forum config'indeki `captcha` değerine göre uygun strateji seçilir:
-          - "image"  : Klasik metin/karakter CAPTCHA
-          - "grid"   : Resimli eşleştirme CAPTCHA (reCAPTCHA tarzı)
-          - "math"   : "3 + 7 = ?" tipi
-          - "slider" : Kaydırmalı doğrulama
-          - "none"   : CAPTCHA yok
+        The appropriate strategy is selected based on the `captcha` value in the forum config:
+          - "image"  : Classic text/character CAPTCHA
+          - "grid"   : Image matching CAPTCHA (reCAPTCHA style)
+          - "math"   : "3 + 7 = ?" type
+          - "slider" : Slider verification
+          - "none"   : No CAPTCHA
 
         Returns:
-            {field_name: solved_value} veya None (çözüm başarısız ise).
+            {field_name: solved_value} or None (if solution fails).
         """
         captcha_cfg = self.gen_cfg.get("captcha_config", {})
         captcha_type = self.gen_cfg.get("captcha", "none")

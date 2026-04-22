@@ -1,23 +1,23 @@
 # collectors/config/forums.yaml
 #
-# Forum konfigürasyonları.
-# Kimlik bilgileri burada saklanmaz — sadece ${ENV_VAR} referansları kullanılır.
-# Gerçek değerleri collectors/.env dosyasına koy (.env.example'dan kopyala).
+# Forum configurations.
+# Credentials are not stored here — only ${ENV_VAR} references are used.
+# Put actual values in collectors/.env file (copy from .env.example).
 #
-# Pre-filter açıklaması:
-#   pre_filter.keywords listesindeki kelimelerden biri başlık/içerikte geçiyorsa
-#   o post "high_risk: true" olarak işaretlenir; boş liste = her şey high_risk.
+# Pre-filter explanation:
+#   If any word in pre_filter.keywords list appears in title/content
+#   that post is marked as "high_risk: true"; empty list = everything is high_risk.
 #
-# Captcha açıklaması:
+# Captcha explanation:
 #   account_generation.captcha: none | image | grid | math | slider
-#   account_generation.captcha_config: CaptchaSolver'a geçirilen parametreler
-#   captcha_config.ollama_model: Ollama'da yüklü vision modeli (örn. llava:34b)
+#   account_generation.captcha_config: Parameters passed to CaptchaSolver
+#   captcha_config.ollama_model: Vision model installed in Ollama (e.g. llava:34b)
 
 forums:
 
   # ------------------------------------------------------------------
-  # RansomHouse — React SPA, giriş gerektirmez, Playwright ile render
-  # Collector tipi: spa  →  js_collector.SPALeakCollector
+  # RansomHouse — React SPA, login not required, render with Playwright
+  # Collector type: spa  →  js_collector.SPALeakCollector
   # ------------------------------------------------------------------
   - id: ransomhouse
     name: "RansomHouse"
@@ -36,7 +36,7 @@ forums:
         url: "/"
         enabled: true
 
-    # render tamamlandığında belirgin olan CSS selector
+    # CSS selector indicating render is complete
     wait_selector: "div.cls_record"
 
     selectors:
@@ -44,7 +44,7 @@ forums:
       title: ".cls_recordTop"
       body: ".cls_recordBottom"
       website: ".cls_recordMiddle"
-      next_page: ""          # tek sayfa, sayfalama yok
+      next_page: ""          # single page, no pagination
 
     rate_limit:
       min_delay: 5.0
@@ -53,8 +53,8 @@ forums:
       backoff_on_429: 120
 
     pre_filter:
-      # RansomHouse kayıtlarındaki gerçek anahtar kelimeler
-      # (her kayıtta Status/Action bulunuyor → tümü high_risk)
+      # Actual keywords found in RansomHouse records
+      # (Status/Action is present in every record → all are high_risk)
       keywords:
         - "encrypted"
         - "status"
@@ -93,12 +93,12 @@ forums:
         password: "{generated_password}"
         email: "{generated_email}"
         agree_tos: "1"
-      # image CAPTCHA — CaptchaSolver.solve(image_bytes, TEXT) kullanılır
+      # image CAPTCHA — uses CaptchaSolver.solve(image_bytes, TEXT)
       captcha: image
       captcha_config:
-        ollama_model: "qwen3-vl:32b"           # Ollama'da yüklü model adı
-        field_name: "captcha"           # POST form alanının adı
-        image_selector: "img.captcha"  # Kayıt sayfasındaki CAPTCHA görseli
+        ollama_model: "qwen3-vl:32b"           # Model name installed in Ollama
+        field_name: "captcha"           # Name of the POST form field
+        image_selector: "img.captcha"  # CAPTCHA image on registration page
       credentials_file: "accounts/breachforums.json"
 
     sections:
@@ -129,7 +129,7 @@ forums:
       max_requests_per_hour: 120
       backoff_on_429: 60
 
-    # High-risk ön filtresi — bu kelimelerden biri geçen postlar öncelikli analiz için işaretlenir
+    # High-risk pre-filter — posts containing any of these words are marked for priority analysis
     pre_filter:
       keywords:
         - "database"
@@ -176,7 +176,7 @@ forums:
         password: "{generated_password}"
         email: "{generated_email}"
         agree_tos: "1"
-      # Math CAPTCHA — Rus forumlarında yaygın
+      # Math CAPTCHA — common in Russian forums
       captcha: math
       captcha_config:
         ollama_model: "qwen3-vl:32b"
@@ -214,9 +214,9 @@ forums:
 
     pre_filter:
       keywords:
-        - "база"         # Rusça "database"
-        - "дамп"         # Rusça "dump"
-        - "утечка"       # Rusça "leak"
+        - "база"         # Russian "database"
+        - "дамп"         # Russian "dump"
+        - "утечка"       # Russian "leak"
         - "database"
         - "dump"
         - "leak"
@@ -247,7 +247,7 @@ forums:
       session_ttl: 3600
 
     account_generation:
-      enabled: false    # invite-only — kayıt kapalı
+      enabled: false    # invite-only — registration closed
       credentials_file: "accounts/exploit_in.json"
 
     sections:
@@ -295,7 +295,7 @@ forums:
 defaults:
   request_timeout: 30
   max_retries: 3
-  # Her 50 istekte bir Tor devresi yenilenir (TorManager._tick ile)
+  # Tor circuit is rotated every 50 requests (via TorManager._tick)
   rotate_circuit_every: 50
   user_agent_rotate: true
   respect_robots_txt: false
