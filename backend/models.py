@@ -1,4 +1,5 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
 
@@ -41,6 +42,16 @@ class LeakRecord(Base):
     severity = Column(String(32), nullable=True)
     published_at = Column(DateTime(timezone=True), nullable=False)
     collected_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # Cleaned raw text for the analyzer
+    raw_content_text = Column(Text, nullable=True)
+    # Whether it has been processed by the analyzer
+    is_analyzed = Column(Boolean, default=False, nullable=False)
+    # Links found in the card (JSONB list)
+    detected_links = Column(JSONB, nullable=True)
+    # Number of email addresses extracted from the text
+    email_count = Column(Integer, nullable=True)
+    # Estimated file size extracted from the text (in MB)
+    estimated_size_mb = Column(Numeric(precision=12, scale=2), nullable=True)
 
     source = relationship("Source", back_populates="leak_records")
     company = relationship("Company", back_populates="leak_records")
