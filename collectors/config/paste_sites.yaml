@@ -1,0 +1,47 @@
+# collectors/config/paste_sites.yaml
+#
+# Paste site configuration — no hardcoded URLs/keys.
+# API keys are loaded via .env (not ${ENV_VAR}, using os.environ).
+#
+# CAPTCHA settings:
+#   detection: cloudflare | image | none
+#   image_selector: CSS selector (for image CAPTCHA)
+#   tor_control_port: Tor control port for Cloudflare bypass
+
+paste_sites:
+
+  # ------------------------------------------------------------------
+  # Pastebin.com — public archive scraping
+  # CAPTCHA: Cloudflare block → Tor circuit rotation
+  # ------------------------------------------------------------------
+  - id: pastebin
+    name: "Pastebin.com"
+    enabled: true
+    max_items: 60
+    rate_limit_seconds: 2.0
+
+    # Tor proxy (optional — uncomment and requires active Tor)
+    # tor_socks_port: 9050
+    # tor_control_port: 9051
+
+    captcha:
+      detection: cloudflare
+
+  # ------------------------------------------------------------------
+  # Paste.ee — REST API (PASTEEE_API_KEY) + scraping fallback
+  # API key in .env file: PASTEEE_API_KEY=your_key
+  # CAPTCHA: yok (API ile auth, scraping'de de yok)
+  # ------------------------------------------------------------------
+  - id: paste_ee
+    name: "Paste.ee"
+    enabled: true
+    max_items: 60
+    rate_limit_seconds: 1.5
+    api_key_env: "PASTEEE_API_KEY"
+
+    captcha:
+      detection: none
+
+    # Known paste ID list for scraping fallback if API key is missing:
+    # (paste.ee public IDs — populated from watch list in real environment)
+    seed_paste_ids: []
