@@ -1,11 +1,70 @@
 # collectors/config/forums.yaml
 #
-# Forum configurations for the darknet leak collector.
-# Credentials are never stored here — reference ${ENV_VAR} placeholders only.
-# Set actual values in collectors/.env (copy from .env.example).
+# Forum konfigürasyonları.
+# Kimlik bilgileri burada saklanmaz — sadece ${ENV_VAR} referansları kullanılır.
+# Gerçek değerleri collectors/.env dosyasına koy (.env.example'dan kopyala).
+#
+# Pre-filter açıklaması:
+#   pre_filter.keywords listesindeki kelimelerden biri başlık/içerikte geçiyorsa
+#   o post "high_risk: true" olarak işaretlenir; boş liste = her şey high_risk.
+#
+# Captcha açıklaması:
+#   account_generation.captcha: none | image | grid | math | slider
+#   account_generation.captcha_config: CaptchaSolver'a geçirilen parametreler
+#   captcha_config.ollama_model: Ollama'da yüklü vision modeli (örn. llava:34b)
 
 forums:
 
+  # ------------------------------------------------------------------
+  # RansomHouse — React SPA, giriş gerektirmez, Playwright ile render
+  # Collector tipi: spa  →  js_collector.SPALeakCollector
+  # ------------------------------------------------------------------
+  - id: ransomhouse
+    name: "RansomHouse"
+    enabled: true
+    type: spa
+    base_url: "http://zohlm7ahjwegcedoz7lrdrti7bvpofymcayotp744qhx6gjmxbuo2yid.onion"
+
+    auth:
+      type: none
+
+    account_generation:
+      enabled: false
+
+    sections:
+      - name: "Victims"
+        url: "/"
+        enabled: true
+
+    # render tamamlandığında belirgin olan CSS selector
+    wait_selector: "div.cls_record"
+
+    selectors:
+      post_item: "div.cls_record"
+      title: ".cls_recordTop"
+      body: ".cls_recordBottom"
+      website: ".cls_recordMiddle"
+      next_page: ""          # tek sayfa, sayfalama yok
+
+    rate_limit:
+      min_delay: 5.0
+      max_delay: 12.0
+      max_requests_per_hour: 40
+      backoff_on_429: 120
+
+    pre_filter:
+      # RansomHouse kayıtlarındaki gerçek anahtar kelimeler
+      # (her kayıtta Status/Action bulunuyor → tümü high_risk)
+      keywords:
+        - "encrypted"
+        - "status"
+        - "action"
+        - "evidence"
+        - "disclosed"
+        - "sold"
+        - "deadline"
+
+  # ------------------------------------------------------------------
   - id: breachforums
     name: "BreachForums"
     enabled: true
@@ -13,17 +72,17 @@ forums:
     clearnet_url: "https://breachforums.st"
 
     auth:
-      type: form                         # form | cookie | none
+      type: form
       login_url: "/login"
       login_method: POST
       fields:
         username: "${BREACHFORUMS_USER}"
         password: "${BREACHFORUMS_PASS}"
-        csrf_field: "csrf_token"         # collector fetches it from login page
+        csrf_field: "csrf_token"
       success_indicator: "logout"
       session_cookie_name: "xf_session"
       cookie_file: "cookies/breachforums.json"
-      session_ttl: 3600                  # seconds before forced re-login
+      session_ttl: 3600
 
     account_generation:
       enabled: true
@@ -34,7 +93,12 @@ forums:
         password: "{generated_password}"
         email: "{generated_email}"
         agree_tos: "1"
-      captcha: none                      # none | recaptcha | hcaptcha | image
+      # image CAPTCHA — CaptchaSolver.solve(image_bytes, TEXT) kullanılır
+      captcha: image
+      captcha_config:
+        ollama_model: "qwen3-vl:32b"           # Ollama'da yüklü model adı
+        field_name: "captcha"           # POST form alanının adı
+        image_selector: "img.captcha"  # Kayıt sayfasındaki CAPTCHA görseli
       credentials_file: "accounts/breachforums.json"
 
     sections:
@@ -65,6 +129,25 @@ forums:
       max_requests_per_hour: 120
       backoff_on_429: 60
 
+    # High-risk ön filtresi — bu kelimelerden biri geçen postlar öncelikli analiz için işaretlenir
+    pre_filter:
+      keywords:
+        - "database"
+        - "dump"
+        - "breach"
+        - "leak"
+        - "combolist"
+        - "password"
+        - "credential"
+        - "email"
+        - "ssn"
+        - "credit card"
+        - "fullz"
+        - "bank"
+        - "government"
+        - "healthcare"
+        - "million"
+
   - id: xss_forum
     name: "XSS.is"
     enabled: true
@@ -93,7 +176,12 @@ forums:
         password: "{generated_password}"
         email: "{generated_email}"
         agree_tos: "1"
-      captcha: none
+      # Math CAPTCHA — Rus forumlarında yaygın
+      captcha: math
+      captcha_config:
+        ollama_model: "qwen3-vl:32b"
+        field_name: "captcha_answer"
+        expression_selector: ".captcha-math"
       credentials_file: "accounts/xss_forum.json"
 
     sections:
@@ -124,6 +212,21 @@ forums:
       max_requests_per_hour: 90
       backoff_on_429: 90
 
+    pre_filter:
+      keywords:
+        - "база"         # Rusça "database"
+        - "дамп"         # Rusça "dump"
+        - "утечка"       # Rusça "leak"
+        - "database"
+        - "dump"
+        - "leak"
+        - "combo"
+        - "mail"
+        - "pass"
+        - "million"
+        - "government"
+        - "bank"
+
   - id: exploit_in
     name: "Exploit.in"
     enabled: true
@@ -144,7 +247,7 @@ forums:
       session_ttl: 3600
 
     account_generation:
-      enabled: false            # invite-only
+      enabled: false    # invite-only — kayıt kapalı
       credentials_file: "accounts/exploit_in.json"
 
     sections:
@@ -175,9 +278,24 @@ forums:
       max_requests_per_hour: 60
       backoff_on_429: 120
 
+    pre_filter:
+      keywords:
+        - "database"
+        - "leak"
+        - "dump"
+        - "exploit"
+        - "vulnerability"
+        - "breach"
+        - "combo"
+        - "fullz"
+        - "million"
+        - "corporate"
+        - "government"
+
 defaults:
   request_timeout: 30
   max_retries: 3
+  # Her 50 istekte bir Tor devresi yenilenir (TorManager._tick ile)
   rotate_circuit_every: 50
   user_agent_rotate: true
   respect_robots_txt: false
