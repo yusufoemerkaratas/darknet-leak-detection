@@ -340,6 +340,17 @@ class AuthenticatedForumCollector:
                 logger.warning(f"[{self.forum_id}] Post parse error: {e}")
         return posts
 
+    def _is_high_risk(self, text: str) -> bool:
+        """
+        Pre-filter: compare text with the pre_filter.keywords list in forums.yaml.
+        If there is a matching keyword, it returns True (high priority), if the list is empty, it also returns True.
+        """
+        keywords = self.forum.get("pre_filter", {}).get("keywords", [])
+        if not keywords:
+            return True
+        text_lower = text.lower()
+        return any(kw.lower() in text_lower for kw in keywords)
+
     def _parse_post_element(self, el, page_url: str, crawl_job_id: str = "") -> Optional[dict]:
         """Extract structured data from a single post element."""
         title_el = el.select_one(self.sel.get("title", ""))
@@ -350,38 +361,54 @@ class AuthenticatedForumCollector:
         if not title:
             return None
 
-        author = _safe_text(el.select_one(self.sel.get("author", "")), 100)
-        body = _safe_text(el.select_one(self.sel.get("body", "")), 2000)
+        author   = _safe_text(el.select_one(self.sel.get("author", "")), 100)
+        body     = _safe_text(el.select_one(self.sel.get("body", "")), 2000)
         category = _safe_text(el.select_one(self.sel.get("category", "")), 100)
 
-        ts_el = el.select_one(self.sel.get("timestamp", ""))
-        ts_attr = self.sel.get("timestamp_attr", "datetime")
+        ts_el     = el.select_one(self.sel.get("timestamp", ""))
+        ts_attr   = self.sel.get("timestamp_attr", "datetime")
         timestamp = _safe_attr(ts_el, ts_attr) or _safe_text(ts_el, 50)
 
         # Thread link
-        link_el = title_el if title_el.name == "a" else title_el.find("a")
+        link_el    = title_el if title_el.name == "a" else title_el.find("a")
         thread_url = ""
         if link_el:
             thread_url = self._full_url(link_el.get("href", ""))
 
-        raw_content = f"{title}\n{author}\n{body}"
+        raw_content  = f"{title}\n{author}\n{body}"
         content_hash = _sha256(raw_content)
 
+        # For analyzer: full text cleaned from noise
+        full_body_text = el.get_text(separator=" ", strip=True)
+
+        # Extract all links in the element (except anchor and in-page)
+        detected_links = [
+            {"url": self._full_url(a["href"]), "text": a.get_text(strip=True) or a["href"]}
+            for a in el.find_all("a", href=True)
+            if a["href"] and not a["href"].startswith("#")
+        ]
+
+        # Pre-filter: high_risk tag
+        high_risk = self._is_high_risk(title + " " + body)
+
         return {
-            "forum_id": self.forum_id,
-            "forum_name": self.forum.get("name", ""),
-            "title": title,
-            "author": author,
-            "body_preview": body[:500],
-            "category": category,
-            "timestamp": timestamp,
-            "thread_url": thread_url,
-            "source_url": page_url,
-            "source_type": "darknet_forum",
-            "content_hash": content_hash,
-            "raw_content": raw_content,
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
-            "crawl_job_id": crawl_job_id,
+            "forum_id":       self.forum_id,
+            "forum_name":     self.forum.get("name", ""),
+            "title":          title,
+            "author":         author,
+            "body_preview":   body[:500],
+            "full_body_text": full_body_text,
+            "detected_links": detected_links,
+            "high_risk":      high_risk,
+            "category":       category,
+            "timestamp":      timestamp,
+            "thread_url":     thread_url,
+            "source_url":     page_url,
+            "source_type":    "darknet_forum",
+            "content_hash":   content_hash,
+            "raw_content":    raw_content,
+            "fetched_at":     datetime.now(timezone.utc).isoformat(),
+            "crawl_job_id":   crawl_job_id,
         }
 
     def _extract_next_url(self, soup: BeautifulSoup) -> Optional[str]:
