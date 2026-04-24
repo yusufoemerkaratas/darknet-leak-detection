@@ -10,6 +10,9 @@ from datetime import datetime, timezone
 from db import SessionLocal
 from models import Source, Company, LeakRecord
 from crud import bulk_insert_leak_records
+from crud import dedup_cache
+
+dedup_cache.clear()
 
 
 def get_or_create_source(db):

@@ -1,4 +1,5 @@
 from models import Source, Company, LeakRecord
+dedup_cache = set()
 
 def create_source(db, source):
     db_source = Source(name=source.name, url=source.url)
@@ -78,22 +79,45 @@ def bulk_insert_leak_records(db, leak_records):
 
     content_hashes = [record["content_hash"] for record in leak_records]
 
-    existing_hashes = {
-        row[0]
-        for row in db.query(LeakRecord.content_hash)
-        .filter(LeakRecord.content_hash.in_(content_hashes))
-        .all()
+    cached_hashes = {
+        content_hash
+        for content_hash in content_hashes
+        if content_hash in dedup_cache
     }
+
+    hashes_to_check_in_db = [
+        content_hash
+        for content_hash in content_hashes
+        if content_hash not in cached_hashes
+    ]
+
+    existing_hashes = set()
+
+    if hashes_to_check_in_db:
+        existing_hashes = {
+            row[0]
+            for row in db.query(LeakRecord.content_hash)
+            .filter(LeakRecord.content_hash.in_(hashes_to_check_in_db))
+            .all()
+        }
+
+    all_duplicate_hashes = cached_hashes.union(existing_hashes)
 
     new_records = [
         record
         for record in leak_records
-        if record["content_hash"] not in existing_hashes
+        if record["content_hash"] not in all_duplicate_hashes
     ]
 
     if new_records:
         db.bulk_insert_mappings(LeakRecord, new_records)
         db.commit()
+
+        for record in new_records:
+            dedup_cache.add(record["content_hash"])
+
+    for content_hash in existing_hashes:
+        dedup_cache.add(content_hash)
 
     return {
         "inserted": len(new_records),
