@@ -1,9 +1,11 @@
-from sqlalchemy import create_engine, event
-from dotenv import load_dotenv
 import os
-from pathlib import Path
 import time
 import logging
+from pathlib import Path
+
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker
 
 env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
