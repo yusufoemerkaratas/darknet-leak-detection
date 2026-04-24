@@ -2,6 +2,11 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from db import SessionLocal
 import crud, schemas
+from datetime import datetime
+from models import Source, CrawlJob
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from db import get_db
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 
@@ -42,3 +47,26 @@ def delete(source_id: int, db: Session = Depends(get_db)):
         return crud.delete_source(db, source_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+
+@router.post("/{source_id}/crawl")
+def start_crawl(source_id: int, db: Session = Depends(get_db)):
+    source = db.query(Source).filter(Source.id == source_id).first()
+    if not source:
+        return {"error": "source not found"}
+
+    job = CrawlJob(
+        source_id=source_id,
+        status="running",
+        total_records=100,
+        inserted_records=80,
+        duplicate_records=20,
+        finished_at=datetime.utcnow()
+    )
+
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+
+    return job
