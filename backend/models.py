@@ -56,3 +56,21 @@ class AnalysisResult(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     leak_record = relationship("LeakRecord", back_populates="analysis_result")
+
+
+
+class CrawlJob(Base):
+    __tablename__ = "crawl_jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    source_id = Column(Integer, ForeignKey("sources.id", ondelete="CASCADE"), nullable=False)
+
+    status = Column(String(32), nullable=False, default="pending")
+    total_records = Column(Integer, default=0)
+    inserted_records = Column(Integer, default=0)
+    duplicate_records = Column(Integer, default=0)
+
+    started_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+
+    source = relationship("Source")
