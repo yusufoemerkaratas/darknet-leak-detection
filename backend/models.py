@@ -62,15 +62,19 @@ class AnalysisResult(Base):
 class CrawlJob(Base):
     __tablename__ = "crawl_jobs"
 
-    id = Column(Integer, primary_key=True, index=True)
-    source_id = Column(Integer, ForeignKey("sources.id", ondelete="CASCADE"), nullable=False)
+    __table_args__ = (
+        Index("ix_crawl_jobs_source_id", "source_id"),
+        Index("ix_crawl_jobs_status", "status"),
+        Index("ix_crawl_jobs_started_at", "started_at"),
+    )
 
-    status = Column(String(32), nullable=False, default="pending")
+    id = Column(Integer, primary_key=True, index=True)
+    source_id = Column(Integer, ForeignKey("sources.id"))
+
+    status = Column(String, default="running")
     total_records = Column(Integer, default=0)
     inserted_records = Column(Integer, default=0)
     duplicate_records = Column(Integer, default=0)
 
-    started_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    finished_at = Column(DateTime(timezone=True), nullable=True)
-
-    source = relationship("Source")
+    started_at = Column(DateTime)
+    finished_at = Column(DateTime)
