@@ -66,6 +66,7 @@ class CrawlJob(Base):
         Index("ix_crawl_jobs_source_id", "source_id"),
         Index("ix_crawl_jobs_status", "status"),
         Index("ix_crawl_jobs_started_at", "started_at"),
+        Index("ix_crawl_jobs_status", "status"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
