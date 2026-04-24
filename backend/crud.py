@@ -1,4 +1,4 @@
-from models import Source
+from models import Source, Company, LeakRecord
 
 def create_source(db, source):
     db_source = Source(name=source.name, url=source.url)
@@ -40,8 +40,6 @@ def delete_source(db, source_id):
     db.commit()
     return {"message": "deleted"}
 
-from models import Company
-
 def create_company(db, company):
     db_company = Company(name=company.name)
     db.add(db_company)
@@ -70,3 +68,34 @@ def delete_company(db, company_id):
     db.delete(db_company)
     db.commit()
     return {"message": "deleted"}
+
+def bulk_insert_leak_records(db, leak_records):
+    if not leak_records:
+        return {
+            "inserted": 0,
+            "duplicates_skipped": 0
+        }
+
+    content_hashes = [record["content_hash"] for record in leak_records]
+
+    existing_hashes = {
+        row[0]
+        for row in db.query(LeakRecord.content_hash)
+        .filter(LeakRecord.content_hash.in_(content_hashes))
+        .all()
+    }
+
+    new_records = [
+        record
+        for record in leak_records
+        if record["content_hash"] not in existing_hashes
+    ]
+
+    if new_records:
+        db.bulk_insert_mappings(LeakRecord, new_records)
+        db.commit()
+
+    return {
+        "inserted": len(new_records),
+        "duplicates_skipped": len(leak_records) - len(new_records)
+    }
