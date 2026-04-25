@@ -99,3 +99,13 @@ GET /health
 * Uses PostgreSQL
 * Uses SQLAlchemy ORM
 * Alembic for migrations
+
+---
+
+## 🗂️ Table Partitioning (Future Work)
+
+`leak_records` is currently a single unpartitioned table. At high volumes (millions of rows),
+partitioning by `published_at` (monthly range partitions) would improve query performance
+and make old-data archival easier. This is not implemented yet — existing indexes on
+`published_at` and the composite `(published_at, collected_at)` index are sufficient for
+the current throughput targets (1000+ docs/min).
