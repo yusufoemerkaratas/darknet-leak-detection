@@ -227,6 +227,20 @@ forums:
         - "government"
         - "bank"
 
+  - id: e2e_test_site
+    name: "End-to-End AI and Tor Test"
+    enabled: true
+    type: spa  # Use Playwright
+    base_url: "https://the-internet.herokuapp.com/login"
+    auth:
+      login_url: "https://the-internet.herokuapp.com/login"
+      username_field: "#username"
+      password_field: "#password"
+      submit_button: "button[type='submit']"
+    account_generation:
+      enabled: true
+      captcha: image  # Trigger Ollama LLaVA
+
   - id: exploit_in
     name: "Exploit.in"
     enabled: true
