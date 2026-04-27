@@ -39,3 +39,5 @@ collectors/failed_storage/
 
 # Local demo docs (not for repo)
 collectors/PROTOTYPE_DEMO.md
+collectors/PROTOTYPE_README.md
+SYSTEM_ANALYSIS.md
