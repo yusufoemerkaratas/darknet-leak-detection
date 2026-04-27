@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
@@ -42,16 +42,44 @@ class LeakRecord(Base):
     severity = Column(String(32), nullable=True)
     published_at = Column(DateTime(timezone=True), nullable=False)
     collected_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    # Cleaned raw text for the analyzer
     raw_content_text = Column(Text, nullable=True)
-    # Whether it has been processed by the analyzer
     is_analyzed = Column(Boolean, default=False, nullable=False)
-    # Links found in the card (JSONB list)
     detected_links = Column(JSONB, nullable=True)
-    # Number of email addresses extracted from the text
     email_count = Column(Integer, nullable=True)
-    # Estimated file size extracted from the text (in MB)
     estimated_size_mb = Column(Numeric(precision=12, scale=2), nullable=True)
 
     source = relationship("Source", back_populates="leak_records")
     company = relationship("Company", back_populates="leak_records")
+    analysis_result = relationship("AnalysisResult", back_populates="leak_record", uselist=False, cascade="all, delete-orphan")
+
+
+class AnalysisResult(Base):
+    __tablename__ = "analysis_result"
+
+    id = Column(Integer, primary_key=True, index=True)
+    leak_record_id = Column(Integer, ForeignKey("leak_records.id", ondelete="CASCADE"), nullable=False, unique=True)
+    detected_patterns = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    leak_record = relationship("LeakRecord", back_populates="analysis_result")
+
+
+class CrawlJob(Base):
+    __tablename__ = "crawl_jobs"
+
+    __table_args__ = (
+        Index("ix_crawl_jobs_source_id", "source_id"),
+        Index("ix_crawl_jobs_status", "status"),
+        Index("ix_crawl_jobs_started_at", "started_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    source_id = Column(Integer, ForeignKey("sources.id", ondelete="CASCADE"))
+
+    status = Column(String(32), nullable=False, default="running")
+    total_records = Column(Integer, default=0)
+    inserted_records = Column(Integer, default=0)
+    duplicate_records = Column(Integer, default=0)
+
+    started_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    finished_at = Column(DateTime(timezone=True), nullable=True)

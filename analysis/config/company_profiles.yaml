@@ -1,0 +1,46 @@
+metadata:
+  version: "1.0"
+  last_updated: "2026-04-18"
+
+companies:
+  - name: Microsoft
+    aliases:
+      - MSFT
+      - MS
+      - Microsoft Corp
+      - Micro$oft
+    domains:
+      - microsoft.com
+
+  - name: Amazon
+    aliases:
+      - AMZN
+      - AWS
+      - Amazon.com
+    domains:
+      - amazon.com
+
+  - name: Google
+    aliases:
+      - GOOGL
+      - Alphabet
+      - GCP
+    domains:
+      - google.com
+
+  - name: Meta
+    aliases:
+      - FB
+      - Facebook
+      - Instagram
+    domains:
+      - meta.com
+      - facebook.com
+      - instagram.com
+
+  - name: Apple
+    aliases:
+      - AAPL
+      - Apple Inc
+    domains:
+      - apple.com

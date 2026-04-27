@@ -66,6 +66,26 @@ curl http://127.0.0.1:8000/health
 
 ```text
 http://127.0.0.1:8000/docs
+
+### One-command dev startup (Linux/macOS)
+
+```bash
+./scripts/dev.sh
+```
+
+This script copies `.env.example` to `.env` if missing, starts Postgres
+and the backend via Docker, then applies migrations.
+
+### Local (host) usage notes
+
+- The backend loads environment variables from the repo-root `.env`.
+- For host-side Alembic commands, set `DATABASE_URL` to `localhost`.
+
+Example:
+
+```bash
+DATABASE_URL=postgresql+psycopg2://postgres:password@localhost:5432/mydb alembic current
+```
 ```
 
 ## Docker Commands

@@ -8,12 +8,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from dateutil import parser as date_parser
+import yaml
 
 # Add parent directory to sys.path to import backend modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.db import SessionLocal
-from backend.models import LeakRecord, Source, Company
+from backend.models import AnalysisResult, LeakRecord, Source, Company
+from analysis.detectors.credential_detector import CredentialDetector
+from analysis.detectors.terminology_detector import TerminologyDetector
+from analysis.detectors.company_detector import CompanyDetector
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -21,23 +25,37 @@ logger = logging.getLogger(__name__)
 RAW_STORAGE_DIR       = Path(__file__).parent / "raw_storage"
 PROCESSED_STORAGE_DIR = Path(__file__).parent / "processed_storage"
 FAILED_STORAGE_DIR    = Path(__file__).parent / "failed_storage"
+COMPANY_PROFILE_PATH  = Path(__file__).resolve().parent.parent / "analysis" / "config" / "company_profiles.yaml"
+
+_credential_detector  = CredentialDetector()
+_terminology_detector = TerminologyDetector()
+
+def _load_company_profiles() -> list:
+    if not COMPANY_PROFILE_PATH.exists():
+        return []
+    try:
+        with open(COMPANY_PROFILE_PATH, "r", encoding="utf-8") as fh:
+            config = yaml.safe_load(fh) or {}
+        return config.get("companies", [])
+    except Exception:
+        return []
+
+_company_detector = CompanyDetector(_load_company_profiles())
+
 
 # ---------------------------------------------------------------------------
 # Regex-based metadata extractors
 # ---------------------------------------------------------------------------
 
-# Email address counter
 _EMAIL_RE = re.compile(
     r'\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b'
 )
 
-# File size: "1.2 GB", "500 MB", "2TB" etc.
 _SIZE_RE = re.compile(
     r'(\d+(?:[.,]\d+)?)\s*(TB|GB|MB|tb|gb|mb)',
     re.IGNORECASE,
 )
 
-# Expressions like "X records", "X rows", "X lines" at the start of the line
 _RECORD_COUNT_RE = re.compile(
     r'([\d,\.]+)\s*(?:million|mln|M)?\s*(?:records?|rows?|lines?|entries|user)',
     re.IGNORECASE,
@@ -45,16 +63,11 @@ _RECORD_COUNT_RE = re.compile(
 
 
 def _extract_email_count(text: str) -> Optional[int]:
-    """Count email addresses in text."""
     found = _EMAIL_RE.findall(text)
     return len(found) if found else None
 
 
 def _extract_size_mb(text: str) -> Optional[float]:
-    """
-    Convert the first size expression in text to MB.
-    E.g.: "1.5 GB" → 1536.0, "2 TB" → 2097152.0
-    """
     m = _SIZE_RE.search(text)
     if not m:
         return None
@@ -99,6 +112,54 @@ def parse_date(date_str: str) -> datetime:
         return date_parser.parse(date_str)
     except Exception:
         return datetime.utcnow()
+
+
+def _build_analysis_text(doc: dict) -> str:
+    parts = [
+        doc.get("title", ""),
+        doc.get("body", ""),
+        doc.get("body_preview", ""),
+        doc.get("content", ""),
+    ]
+    return "\n".join(p for p in parts if p)
+
+
+def _serialize_detection_results(text: str) -> dict:
+    patterns = []
+    for result in _credential_detector.detect(text):
+        patterns.append({
+            "pattern_type": result.pattern_type,
+            "matched_text": result.matched_text,
+            "context":      result.context,
+            "confidence":   result.confidence,
+            "line_number":  result.line_number,
+        })
+
+    terminology = []
+    for result in _terminology_detector.detect(text):
+        terminology.append({
+            "term":         result.term,
+            "priority":     result.priority,
+            "count":        result.count,
+            "line_numbers": result.line_numbers,
+            "context":      result.context,
+        })
+
+    company_indicators = []
+    for result in _company_detector.detect(text):
+        company_indicators.append({
+            "company_name":     result.company_name,
+            "match_type":       result.match_type,
+            "matched_term":     result.matched_term,
+            "confidence":       result.confidence,
+            "similarity_score": result.similarity_score,
+        })
+
+    return {
+        "patterns":           patterns,
+        "terminology":        terminology,
+        "company_indicators": company_indicators,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -147,22 +208,32 @@ def process_file(db, filepath: Path) -> bool:
         collected_at = parse_date(doc.get("fetched_at"))
 
         record = LeakRecord(
-            source_id        = source.id,
-            company_id       = company.id,
-            title            = doc.get("title", "Untitled")[:255],
-            content_hash     = content_hash,
-            raw_url          = doc.get("thread_url") or doc.get("source_url") or "",
-            severity         = "Medium",
-            published_at     = published_at,
-            collected_at     = collected_at,
-            raw_content_text = full_body_text,
-            detected_links   = doc.get("detected_links") or [],
-            is_analyzed      = False,
-            email_count      = email_count,
+            source_id         = source.id,
+            company_id        = company.id,
+            title             = doc.get("title", "Untitled")[:255],
+            content_hash      = content_hash,
+            raw_url           = doc.get("thread_url") or doc.get("source_url") or "",
+            severity          = "Medium",
+            published_at      = published_at,
+            collected_at      = collected_at,
+            raw_content_text  = full_body_text,
+            detected_links    = doc.get("detected_links") or [],
+            is_analyzed       = False,
+            email_count       = email_count,
             estimated_size_mb = estimated_size,
         )
-
         db.add(record)
+        db.commit()
+        db.refresh(record)
+
+        analysis_text = _build_analysis_text(doc)
+        detected = _serialize_detection_results(analysis_text)
+
+        analysis_result = AnalysisResult(
+            leak_record_id    = record.id,
+            detected_patterns = detected,
+        )
+        db.add(analysis_result)
         db.commit()
         return True
 
@@ -173,7 +244,6 @@ def process_file(db, filepath: Path) -> bool:
 
 
 def _move(src: Path, dest_dir: Path) -> None:
-    """Move file to target directory; create target directory if necessary."""
     dest_dir.mkdir(parents=True, exist_ok=True)
     shutil.move(str(src), str(dest_dir / src.name))
 
@@ -203,11 +273,9 @@ def run_pipeline():
                 success = process_file(db, json_file)
 
                 if success:
-                    # Success → move to processed_storage
                     _move(json_file, PROCESSED_STORAGE_DIR / forum_dir.name)
                     processed_count += 1
                 else:
-                    # Failed → move to failed_storage (prevents infinite loop)
                     _move(json_file, FAILED_STORAGE_DIR / forum_dir.name)
                     failed_count += 1
 

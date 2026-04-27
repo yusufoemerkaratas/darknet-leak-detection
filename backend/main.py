@@ -4,12 +4,13 @@ from sqlalchemy.orm import Session
 
 from db import SessionLocal
 from models import LeakRecord, Source
-from routers import source, company
+from routers import source, company, crawl_job
 
 app = FastAPI(title="Datenleck API", version="1.0.0")
 
 app.include_router(source.router)
 app.include_router(company.router)
+app.include_router(crawl_job.router)
 
 
 # ---------------------------------------------------------------------------
@@ -70,7 +71,6 @@ def stats(db: Session = Depends(get_db)):
     )
     records_per_source = {row.name: row.count for row in per_source_rows}
 
-    # High-risk is not yet marked by the pipeline; left room for future expansion
     return {
         "total_records":        total,
         "pending_analysis":     pending,
