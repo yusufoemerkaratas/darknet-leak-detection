@@ -1,10 +1,10 @@
 # collectors/darknet_forum_collector.py
 
 from .tor_manager import TorManager
+from .rate_limiter import RateLimiter
 from bs4 import BeautifulSoup
 from datetime import datetime
 import logging
-import time
 from typing import List, Dict, Optional
 
 logging.basicConfig(level=logging.INFO)
@@ -14,27 +14,41 @@ logger = logging.getLogger(__name__)
 class DarknetForumCollector:
     """
     Collector for darknet forum leak announcements
-    Darknet forum'unda leak announcement'larını topla
     """
     
-    def __init__(self, forum_url: str, socks_port: int = 9050):
+    def __init__(self, forum_url: str, socks_port: int = 9050, rate_cfg: dict = None):
         """
         Initialize darknet forum collector
-        
+
         Args:
             forum_url: Forum's onion address (e.g., http://forum.onion)
             socks_port: SOCKS proxy port (default: 9050)
+            rate_cfg:  RateLimiter config dict (min_delay, max_delay,
+                       max_requests_per_hour, backoff_on_429).
+                       Defaults to conservative values if not provided.
         """
         self.forum_url = forum_url
         self.socks_port = socks_port
         self.tor = TorManager(socks_port=socks_port)
         self.is_authenticated = False
+
+        # Mandatory rate limit before each request
+        _default_rate = {
+            "min_delay": 3.0,
+            "max_delay": 8.0,
+            "max_requests_per_hour": 80,
+            "backoff_on_429": 90,
+        }
+        self.limiter = RateLimiter(
+            forum_id=forum_url,
+            rate_cfg=rate_cfg or _default_rate,
+            rotate_user_agent=True,
+        )
         logger.info(f"Initialized collector for {forum_url}")
     
     def login(self, username: str, password: str) -> bool:
         """
         Authenticate to darknet forum
-        Forum'a giriş yap (authenticate)
         
         Args:
             username: Forum username
@@ -74,7 +88,6 @@ class DarknetForumCollector:
     def scrape_leaks(self, section_url: str) -> List[Dict]:
         """
         Scrape leak announcements from forum section
-        Forum bölümünden leak announcement'larını scrape et
         
         Args:
             section_url: Full URL of forum section (e.g., http://forum.onion/breaches/)
@@ -86,16 +99,26 @@ class DarknetForumCollector:
         
         try:
             logger.info(f"Scraping leaks from {section_url}...")
+            # Rate limit + User-Agent rotation (ban prevention)
+            self.limiter.wait(self.tor.session)
             response = self.tor.fetch(section_url, timeout=30)
-            
+            self.limiter.record_request()
+
             if response is None:
+                self.limiter.log_request(section_url, None, 0, error="no_response")
                 logger.error(f"Failed to fetch {section_url}")
                 return leaks
+
+            if response.status_code == 429:
+                self.limiter.handle_429()
+                return leaks
+
+            self.limiter.log_request(section_url, response.status_code, 0)
             
             soup = BeautifulSoup(response.content, 'html.parser')
             
             # Extract leak announcements
-            # Selector'ları her forum'a özel ayarlaman gerekebilir
+            # You may need to tune selectors per forum
             post_elements = soup.find_all('div', class_='forum-post')
             logger.info(f"Found {len(post_elements)} posts on page")
             
@@ -111,7 +134,7 @@ class DarknetForumCollector:
             logger.info(f"✓ Scraped {len(leaks)} leaks from this page")
             
             # Rotate circuit for anti-detection purposes
-            # Anti-detection: circuit'i rotate et
+            # Anti-detection: rotate circuit
             self.tor.get_new_circuit()
             
             return leaks
@@ -120,20 +143,50 @@ class DarknetForumCollector:
             logger.error(f"Scraping error: {e}")
             return leaks
     
+    # CSS classes: noise elements that interfere with analysis
+    _NOISE_SELECTORS = [
+        '.post-buttons', '.post-controls', '.author-stats',
+        '.signature', '.footer', '.ad', '.advertisement',
+        '.breadcrumb', '.navigation', '.nav', '.sidebar',
+        '.like-button', '.quote-button', '.report-button',
+    ]
+
+    def _clean_post_element(self, post_element):
+        """
+        Remove noisy HTML blocks from post element that interfere with analysis.
+        Operates on a copy to avoid mutating the original soup object.
+        """
+        import copy
+        card = copy.copy(post_element)
+        for selector in self._NOISE_SELECTORS:
+            for noise in card.select(selector):
+                noise.decompose()
+        return card
+
+    def _extract_links(self, element) -> List[Dict]:
+        """
+        Extract links and texts from all <a> tags in the element.
+        Skips empty hrefs and intra-page anchors.
+        """
+        links = []
+        for tag in element.find_all('a', href=True):
+            href = tag.get('href', '').strip()
+            if not href or href.startswith('#'):
+                continue
+            links.append({
+                'url': href,
+                'text': tag.get_text(strip=True) or href,
+            })
+        return links
+
     def _extract_leak_info(self, post_element) -> Optional[Dict]:
         """
-        Extract leak information from HTML post element
-        HTML post element'inden leak bilgisini çıkart
-        
-        Args:
-            post_element: BeautifulSoup element
-        
+        Extract leak information from HTML post element.
+
         Returns:
             Dict with leak info or None if extraction fails
         """
-        
         # Define CSS selectors to try (forum-specific)
-        # CSS selector'larını dene (forum'a özel)
         selectors = {
             'title': [
                 ('h2.post-title', lambda x: x.text),
@@ -166,11 +219,8 @@ class DarknetForumCollector:
                 ('span.victims', lambda x: x.text),
             ]
         }
-        
+
         leak_info = {}
-        
-        # Try each selector until one works
-        # Her selector'u dene, biri işe yarayıncaya kadar
         for field_name, selector_list in selectors.items():
             for css_selector, extractor in selector_list:
                 try:
@@ -180,27 +230,33 @@ class DarknetForumCollector:
                         break
                 except Exception:
                     continue
-        
-        # Only return if we found title (minimum required)
-        # Sadece title varsa return et (zorunlu)
-        if leak_info.get('title'):
-            return {
-                'title': leak_info.get('title', 'Unknown'),
-                'author': leak_info.get('author', 'Unknown'),
-                'date': leak_info.get('date'),
-                'content_summary': leak_info.get('content', ''),
-                'record_count': leak_info.get('record_count'),
-                'source_url': self.forum_url,
-                'source_type': 'darknet_forum',
-                'collected_at': datetime.utcnow().isoformat()
-            }
-        
-        return None
+
+        if not leak_info.get('title'):
+            return None
+
+        # Clean noise and extract full text
+        clean_card = self._clean_post_element(post_element)
+        full_body_text = clean_card.get_text(separator=' ', strip=True)
+        detected_links = self._extract_links(clean_card)
+
+        return {
+            'title': leak_info.get('title', 'Unknown'),
+            'author': leak_info.get('author', 'Unknown'),
+            'date': leak_info.get('date'),
+            'content_summary': leak_info.get('content', ''),
+            'record_count': leak_info.get('record_count'),
+            # Cleaned full card text for analyzer
+            'full_body_text': full_body_text,
+            # All links in the card
+            'detected_links': detected_links,
+            'source_url': self.forum_url,
+            'source_type': 'darknet_forum',
+            'collected_at': datetime.utcnow().isoformat(),
+        }
     
     def scrape_multiple_pages(self, base_section_url: str, page_count: int = 5) -> List[Dict]:
         """
         Scrape leaks from multiple pages
-        Birden fazla sayfa'dan leak'leri scrape et
         
         Args:
             base_section_url: Base URL of section (without page number)
@@ -214,7 +270,6 @@ class DarknetForumCollector:
         for page_num in range(1, page_count + 1):
             try:
                 # Construct page URL (adjust based on forum's URL structure)
-                # URL'yi oluştur (forum'un URL yapısına göre ayarla)
                 if "?" in base_section_url:
                     page_url = f"{base_section_url}&page={page_num}"
                 else:
@@ -223,10 +278,7 @@ class DarknetForumCollector:
                 logger.info(f"Scraping page {page_num}...")
                 leaks = self.scrape_leaks(page_url)
                 all_leaks.extend(leaks)
-                
-                # Be respectful to server - add delay between requests
-                # Server'a saygılı ol - istekler arasına gecikme ekle
-                time.sleep(2)
+                # Delay is managed by limiter; no additional sleep required
                 
             except Exception as e:
                 logger.error(f"Error scraping page {page_num}: {e}")
@@ -238,7 +290,6 @@ class DarknetForumCollector:
     def close(self):
         """
         Close Tor connection
-        Tor bağlantısını kapat
         """
         try:
             self.tor.close()
@@ -247,7 +298,7 @@ class DarknetForumCollector:
             logger.error(f"Error closing collector: {e}")
 
 
-# Usage example / Kullanım örneği:
+# Usage example:
 if __name__ == "__main__":
     try:
         # Initialize collector
@@ -257,15 +308,12 @@ if __name__ == "__main__":
         )
         
         # Login to forum
-        # Forum'a giriş yap
         if collector.login(username="your_username", password="your_password"):
             
             # Scrape single page
-            # Tek sayfayı scrape et
             leaks = collector.scrape_leaks("http://forum.onion/breaches/")
             
             # Display results
-            # Sonuçları göster
             for leak in leaks:
                 print(f"\nTitle: {leak['title']}")
                 print(f"Author: {leak['author']}")
@@ -273,7 +321,6 @@ if __name__ == "__main__":
                 print(f"Summary: {leak['content_summary'][:100]}...")
             
             # Save to database (in real project)
-            # Veritabanına kaydet (gerçek projede)
             # db.save_leaks(leaks)
         
         else:

@@ -16,7 +16,6 @@ logging.getLogger("stem").setLevel(logging.ERROR)
 class TorManager:
     """
     Tor network integration for anonymized web requests.
-    Tor ağı entegrasyonu - anonim web istekleri için
     """
 
     def __init__(self, socks_port=9050, control_port=9051, control_password=None, rotate_every=50):
@@ -43,7 +42,6 @@ class TorManager:
     def _connect_to_tor(self):
         """
         Connect to Tor control port. Raises if Tor is not reachable.
-        Tor kontrol portuna bağlan.
         """
         try:
             self.controller = Controller.from_port(port=self.control_port)
@@ -56,7 +54,6 @@ class TorManager:
     def _reconnect(self, max_attempts=3):
         """
         Reconnect to Tor control port after a connection drop.
-        Bağlantı kopunca yeniden bağlan.
 
         Returns:
             bool: True if reconnected successfully
@@ -91,7 +88,6 @@ class TorManager:
     def _setup_session(self):
         """
         Setup requests session with Tor SOCKS proxy
-        Requests session'ını Tor SOCKS proxy'si ile ayarla
         """
         self.session = requests.Session()
         proxy_url = f'socks5h://127.0.0.1:{self.socks_port}'
@@ -109,7 +105,6 @@ class TorManager:
     def _current_ip(self):
         """
         Return current exit node IP without logging or side-effects.
-        Mevcut exit node IP'sini döndür (loglama olmadan).
         """
         try:
             response = self.session.get(
@@ -123,7 +118,6 @@ class TorManager:
     def verify_tor(self):
         """
         Verify Tor connection by checking current IP.
-        Tor bağlantısını doğrula - mevcut IP'yi kontrol et.
 
         Returns:
             str: Current IP address (Tor exit node IP)
@@ -151,9 +145,6 @@ class TorManager:
         """
         Request a new Tor circuit and verify the exit node IP actually changed.
         Retries up to max_attempts times if the same exit node is selected.
-
-        Yeni Tor circuit oluştur ve exit node IP'sinin gerçekten değiştiğini doğrula.
-        Aynı exit node seçilirse max_attempts kadar tekrar dener.
 
         Args:
             max_attempts: Maximum rotation attempts (default: 3)
@@ -186,7 +177,6 @@ class TorManager:
     def get_circuit_info(self):
         """
         Get information about current Tor circuit
-        Mevcut Tor circuit hakkında bilgi al
         """
         if self.controller is None:
             logger.error("✗ Controller not connected")
@@ -204,7 +194,6 @@ class TorManager:
     def _tick(self):
         """
         Increment request counter and auto-rotate circuit every `rotate_every` requests.
-        Request sayacını artır, eşiğe ulaşınca circuit'i otomatik rotate et.
         """
         self._request_count += 1
         if self._request_count % self.rotate_every == 0:
@@ -214,7 +203,6 @@ class TorManager:
     def fetch(self, url, timeout=15, max_retries=3):
         """
         Fetch URL content through Tor
-        Tor üzerinden URL'den veri çek
 
         Args:
             url: Target URL
@@ -260,7 +248,6 @@ class TorManager:
     def post(self, url, data=None, timeout=15):
         """
         Send POST request through Tor
-        Tor üzerinden POST isteği gönder
 
         Args:
             url: Target URL
@@ -285,7 +272,6 @@ class TorManager:
     def close(self):
         """
         Close Tor connection and HTTP session.
-        Tor bağlantısını ve HTTP session'ı kapat.
         """
         try:
             if self.session:
@@ -297,7 +283,7 @@ class TorManager:
             logger.error(f"Error closing connection: {e}")
 
 
-# Usage example / Kullanım örneği:
+# Usage example:
 if __name__ == "__main__":
     try:
         tor = TorManager(socks_port=9050, control_port=9051)

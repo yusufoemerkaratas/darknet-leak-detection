@@ -16,6 +16,8 @@ from typing import Optional
 from bs4 import BeautifulSoup
 from faker import Faker
 
+from .captcha_solver import CaptchaSolver, CaptchaType
+
 logger = logging.getLogger(__name__)
 fake = Faker()
 
@@ -201,20 +203,116 @@ class AccountRegistrar:
             logger.warning(f"Could not fetch CSRF token: {e}")
         return None
 
+    def _solve_captcha(self, register_page_soup: BeautifulSoup) -> Optional[dict]:
+        """
+        Detect and solve CAPTCHA on the registration page.
+
+        The appropriate strategy is selected based on the `captcha` value in the forum config:
+          - "image"  : Classic text/character CAPTCHA
+          - "grid"   : Image matching CAPTCHA (reCAPTCHA style)
+          - "math"   : "3 + 7 = ?" type
+          - "slider" : Slider verification
+          - "none"   : No CAPTCHA
+
+        Returns:
+            {field_name: solved_value} or None (if solution fails).
+        """
+        captcha_cfg = self.gen_cfg.get("captcha_config", {})
+        captcha_type = self.gen_cfg.get("captcha", "none")
+
+        if captcha_type == "none":
+            return {}
+
+        ollama_model = captcha_cfg.get("ollama_model", "llava")
+        solver = CaptchaSolver(ollama_model=ollama_model)
+        field_name = captcha_cfg.get("field_name", "captcha")
+
+        # --- Type: image (classic text CAPTCHA) ---
+        if captcha_type == "image":
+            img_selector = captcha_cfg.get("image_selector", "img.captcha")
+            img_tag = register_page_soup.select_one(img_selector)
+            if not img_tag:
+                logger.warning(f"[{self.forum['id']}] CAPTCHA img tag not found: {img_selector}")
+                return None
+            img_src = img_tag.get("src", "")
+            img_url = img_src if img_src.startswith("http") else self._full_url(img_src)
+            resp = self.tor.fetch(img_url, timeout=20)
+            if resp is None:
+                logger.error(f"[{self.forum['id']}] CAPTCHA image could not be downloaded")
+                return None
+            solution = solver.solve(resp.content, CaptchaType.TEXT)
+            if solution:
+                return {field_name: solution}
+            logger.error(f"[{self.forum['id']}] Text CAPTCHA could not be solved")
+            return None
+
+        # --- Type: grid (image matching) ---
+        if captcha_type == "grid":
+            grid_selector = captcha_cfg.get("grid_selector", "img.captcha-grid")
+            instruction_selector = captcha_cfg.get("instruction_selector", ".captcha-instruction")
+            grid_size = captcha_cfg.get("grid_size", 3)
+
+            grid_tag = register_page_soup.select_one(grid_selector)
+            instruction_tag = register_page_soup.select_one(instruction_selector)
+            instruction = instruction_tag.get_text(strip=True) if instruction_tag else "Select matching images"
+
+            if not grid_tag:
+                logger.warning(f"[{self.forum['id']}] Grid CAPTCHA element not found")
+                return None
+            img_src = grid_tag.get("src", "")
+            img_url = img_src if img_src.startswith("http") else self._full_url(img_src)
+            resp = self.tor.fetch(img_url, timeout=20)
+            if resp is None:
+                return None
+            indices = solver.solve_grid(resp.content, instruction, grid_size=grid_size)
+            if indices is not None:
+                # Some forums expect selected indices as a comma-separated string
+                return {field_name: ",".join(str(i) for i in indices)}
+            logger.error(f"[{self.forum['id']}] Grid CAPTCHA could not be solved")
+            return None
+
+        # --- Type: math ---
+        if captcha_type == "math":
+            expr_selector = captcha_cfg.get("expression_selector", ".captcha-math")
+            expr_tag = register_page_soup.select_one(expr_selector)
+            expression = expr_tag.get_text(strip=True) if expr_tag else ""
+            if not expression:
+                logger.warning(f"[{self.forum['id']}] Math CAPTCHA expression not found")
+                return None
+            solution = solver.solve_math(expression)
+            if solution:
+                return {field_name: solution}
+            return None
+
+        # --- Type: slider ---
+        if captcha_type == "slider":
+            bg_selector = captcha_cfg.get("background_selector", "img.slider-bg")
+            bg_tag = register_page_soup.select_one(bg_selector)
+            if not bg_tag:
+                logger.warning(f"[{self.forum['id']}] Slider CAPTCHA background not found")
+                return None
+            bg_src = bg_tag.get("src", "")
+            bg_url = bg_src if bg_src.startswith("http") else self._full_url(bg_src)
+            resp = self.tor.fetch(bg_url, timeout=20)
+            if resp is None:
+                return None
+            x_pos = solver.solve_slider(resp.content)
+            if x_pos is not None:
+                return {field_name: str(x_pos)}
+            return None
+
+        logger.warning(f"[{self.forum['id']}] Unknown CAPTCHA type: {captcha_type}")
+        return None
+
     def register(self, credentials_file: str) -> Optional[dict]:
         """
         Generate credentials and register a new account on the forum.
+        Automatically solve CAPTCHA with CaptchaSolver if present.
 
         Returns the credential dict on success, None on failure.
         """
         if not self.gen_cfg.get("enabled", False):
             logger.info(f"Account generation disabled for {self.forum['id']}")
-            return None
-
-        if self.gen_cfg.get("captcha", "none") != "none":
-            logger.warning(
-                f"Forum {self.forum['id']} requires captcha — auto-registration skipped"
-            )
             return None
 
         creds = get_or_create_credentials(credentials_file, self.forum["id"])
@@ -227,9 +325,29 @@ class AccountRegistrar:
         auth_cfg = self.forum.get("auth", {})
         csrf_field = auth_cfg.get("fields", {}).get("csrf_field")
 
-        csrf_token = self._fetch_csrf_token(register_url, csrf_field)
+        # Fetch registration page (for both CSRF and CAPTCHA)
+        page_resp = self.tor.fetch(register_url, timeout=30)
+        if page_resp is None:
+            logger.error(f"[{self.forum['id']}] Registration page could not be fetched")
+            return None
+        page_soup = BeautifulSoup(page_resp.content, "html.parser")
 
-        # Build POST payload from config template
+        csrf_token = None
+        if csrf_field:
+            el = (
+                page_soup.find("input", {"name": csrf_field})
+                or page_soup.find("input", {"id": csrf_field})
+            )
+            if el:
+                csrf_token = el.get("value")
+
+        # Solve CAPTCHA
+        captcha_fields = self._solve_captcha(page_soup)
+        if captcha_fields is None:
+            logger.error(f"[{self.forum['id']}] CAPTCHA could not be solved — registration cancelled")
+            return None
+
+        # Create POST payload
         field_map = self.gen_cfg.get("fields", {})
         payload = {}
         for key, val in field_map.items():
@@ -241,6 +359,9 @@ class AccountRegistrar:
         if csrf_token and csrf_field:
             payload[csrf_field] = csrf_token
 
+        # Add CAPTCHA fields
+        payload.update(captcha_fields)
+
         logger.info(f"Registering {creds['username']} on {self.forum['id']}...")
         resp = self.tor.post(register_url, data=payload, timeout=30)
 
@@ -248,7 +369,6 @@ class AccountRegistrar:
             logger.error("Registration request failed (no response)")
             return None
 
-        # Heuristic success check — look for username in response
         if creds["username"].lower() in resp.text.lower():
             mark_registered(credentials_file, creds["username"])
             logger.info(f"✓ Registered {creds['username']} on {self.forum['id']}")

@@ -1,4 +1,5 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, JSON
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
 
@@ -41,6 +42,11 @@ class LeakRecord(Base):
     severity = Column(String(32), nullable=True)
     published_at = Column(DateTime(timezone=True), nullable=False)
     collected_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    raw_content_text = Column(Text, nullable=True)
+    is_analyzed = Column(Boolean, default=False, nullable=False)
+    detected_links = Column(JSONB, nullable=True)
+    email_count = Column(Integer, nullable=True)
+    estimated_size_mb = Column(Numeric(precision=12, scale=2), nullable=True)
 
     source = relationship("Source", back_populates="leak_records")
     company = relationship("Company", back_populates="leak_records")
@@ -56,7 +62,6 @@ class AnalysisResult(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     leak_record = relationship("LeakRecord", back_populates="analysis_result")
-
 
 
 class CrawlJob(Base):

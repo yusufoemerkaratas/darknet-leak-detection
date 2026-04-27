@@ -1,11 +1,70 @@
 # collectors/config/forums.yaml
 #
-# Forum configurations for the darknet leak collector.
-# Credentials are never stored here — reference ${ENV_VAR} placeholders only.
-# Set actual values in collectors/.env (copy from .env.example).
+# Forum configurations.
+# Credentials are not stored here — only ${ENV_VAR} references are used.
+# Put actual values in collectors/.env file (copy from .env.example).
+#
+# Pre-filter explanation:
+#   If any word in pre_filter.keywords list appears in title/content
+#   that post is marked as "high_risk: true"; empty list = everything is high_risk.
+#
+# Captcha explanation:
+#   account_generation.captcha: none | image | grid | math | slider
+#   account_generation.captcha_config: Parameters passed to CaptchaSolver
+#   captcha_config.ollama_model: Vision model installed in Ollama (e.g. llava:34b)
 
 forums:
 
+  # ------------------------------------------------------------------
+  # RansomHouse — React SPA, login not required, render with Playwright
+  # Collector type: spa  →  js_collector.SPALeakCollector
+  # ------------------------------------------------------------------
+  - id: ransomhouse
+    name: "RansomHouse"
+    enabled: true
+    type: spa
+    base_url: "http://zohlm7ahjwegcedoz7lrdrti7bvpofymcayotp744qhx6gjmxbuo2yid.onion"
+
+    auth:
+      type: none
+
+    account_generation:
+      enabled: false
+
+    sections:
+      - name: "Victims"
+        url: "/"
+        enabled: true
+
+    # CSS selector indicating render is complete
+    wait_selector: "div.cls_record"
+
+    selectors:
+      post_item: "div.cls_record"
+      title: ".cls_recordTop"
+      body: ".cls_recordBottom"
+      website: ".cls_recordMiddle"
+      next_page: ""          # single page, no pagination
+
+    rate_limit:
+      min_delay: 5.0
+      max_delay: 12.0
+      max_requests_per_hour: 40
+      backoff_on_429: 120
+
+    pre_filter:
+      # Actual keywords found in RansomHouse records
+      # (Status/Action is present in every record → all are high_risk)
+      keywords:
+        - "encrypted"
+        - "status"
+        - "action"
+        - "evidence"
+        - "disclosed"
+        - "sold"
+        - "deadline"
+
+  # ------------------------------------------------------------------
   - id: breachforums
     name: "BreachForums"
     enabled: true
@@ -13,17 +72,17 @@ forums:
     clearnet_url: "https://breachforums.st"
 
     auth:
-      type: form                         # form | cookie | none
+      type: form
       login_url: "/login"
       login_method: POST
       fields:
         username: "${BREACHFORUMS_USER}"
         password: "${BREACHFORUMS_PASS}"
-        csrf_field: "csrf_token"         # collector fetches it from login page
+        csrf_field: "csrf_token"
       success_indicator: "logout"
       session_cookie_name: "xf_session"
       cookie_file: "cookies/breachforums.json"
-      session_ttl: 3600                  # seconds before forced re-login
+      session_ttl: 3600
 
     account_generation:
       enabled: true
@@ -34,7 +93,12 @@ forums:
         password: "{generated_password}"
         email: "{generated_email}"
         agree_tos: "1"
-      captcha: none                      # none | recaptcha | hcaptcha | image
+      # image CAPTCHA — uses CaptchaSolver.solve(image_bytes, TEXT)
+      captcha: image
+      captcha_config:
+        ollama_model: "qwen3-vl:32b"           # Model name installed in Ollama
+        field_name: "captcha"           # Name of the POST form field
+        image_selector: "img.captcha"  # CAPTCHA image on registration page
       credentials_file: "accounts/breachforums.json"
 
     sections:
@@ -65,6 +129,25 @@ forums:
       max_requests_per_hour: 120
       backoff_on_429: 60
 
+    # High-risk pre-filter — posts containing any of these words are marked for priority analysis
+    pre_filter:
+      keywords:
+        - "database"
+        - "dump"
+        - "breach"
+        - "leak"
+        - "combolist"
+        - "password"
+        - "credential"
+        - "email"
+        - "ssn"
+        - "credit card"
+        - "fullz"
+        - "bank"
+        - "government"
+        - "healthcare"
+        - "million"
+
   - id: xss_forum
     name: "XSS.is"
     enabled: true
@@ -93,7 +176,12 @@ forums:
         password: "{generated_password}"
         email: "{generated_email}"
         agree_tos: "1"
-      captcha: none
+      # Math CAPTCHA — common in Russian forums
+      captcha: math
+      captcha_config:
+        ollama_model: "qwen3-vl:32b"
+        field_name: "captcha_answer"
+        expression_selector: ".captcha-math"
       credentials_file: "accounts/xss_forum.json"
 
     sections:
@@ -124,6 +212,35 @@ forums:
       max_requests_per_hour: 90
       backoff_on_429: 90
 
+    pre_filter:
+      keywords:
+        - "база"         # Russian "database"
+        - "дамп"         # Russian "dump"
+        - "утечка"       # Russian "leak"
+        - "database"
+        - "dump"
+        - "leak"
+        - "combo"
+        - "mail"
+        - "pass"
+        - "million"
+        - "government"
+        - "bank"
+
+  - id: e2e_test_site
+    name: "End-to-End AI and Tor Test"
+    enabled: true
+    type: spa  # Use Playwright
+    base_url: "https://the-internet.herokuapp.com/login"
+    auth:
+      login_url: "https://the-internet.herokuapp.com/login"
+      username_field: "#username"
+      password_field: "#password"
+      submit_button: "button[type='submit']"
+    account_generation:
+      enabled: true
+      captcha: image  # Trigger Ollama LLaVA
+
   - id: exploit_in
     name: "Exploit.in"
     enabled: true
@@ -144,7 +261,7 @@ forums:
       session_ttl: 3600
 
     account_generation:
-      enabled: false            # invite-only
+      enabled: false    # invite-only — registration closed
       credentials_file: "accounts/exploit_in.json"
 
     sections:
@@ -175,9 +292,24 @@ forums:
       max_requests_per_hour: 60
       backoff_on_429: 120
 
+    pre_filter:
+      keywords:
+        - "database"
+        - "leak"
+        - "dump"
+        - "exploit"
+        - "vulnerability"
+        - "breach"
+        - "combo"
+        - "fullz"
+        - "million"
+        - "corporate"
+        - "government"
+
 defaults:
   request_timeout: 30
   max_retries: 3
+  # Tor circuit is rotated every 50 requests (via TorManager._tick)
   rotate_circuit_every: 50
   user_agent_rotate: true
   respect_robots_txt: false
