@@ -1,5 +1,7 @@
 # collectors/tor_manager.py
 
+import os
+
 from stem import Signal
 from stem.control import Controller
 import certifi
@@ -12,13 +14,17 @@ logger = logging.getLogger(__name__)
 # Suppress stem's noisy SocketClosed warnings from the background reader thread
 logging.getLogger("stem").setLevel(logging.ERROR)
 
+# Allow overriding Tor host via env var (Docker: TOR_HOST=tor, local: 127.0.0.1)
+_DEFAULT_TOR_HOST = os.environ.get("TOR_HOST", "127.0.0.1")
+
 
 class TorManager:
     """
     Tor network integration for anonymized web requests.
     """
 
-    def __init__(self, socks_port=9050, control_port=9051, control_password=None, rotate_every=50):
+    def __init__(self, socks_host=None, socks_port=9050, control_port=9051, control_password=None, rotate_every=50):
+        self.socks_host = socks_host or _DEFAULT_TOR_HOST
         """
         Initialize TorManager
 
@@ -44,7 +50,7 @@ class TorManager:
         Connect to Tor control port. Raises if Tor is not reachable.
         """
         try:
-            self.controller = Controller.from_port(port=self.control_port)
+            self.controller = Controller.from_port(address=self.socks_host, port=self.control_port)
             self.controller.authenticate(password=self.control_password)
             logger.info("✓ Connected to Tor Control Port")
         except Exception as e:
@@ -90,7 +96,7 @@ class TorManager:
         Setup requests session with Tor SOCKS proxy
         """
         self.session = requests.Session()
-        proxy_url = f'socks5h://127.0.0.1:{self.socks_port}'
+        proxy_url = f'socks5h://{self.socks_host}:{self.socks_port}'
 
         self.session.proxies = {
             'http': proxy_url,

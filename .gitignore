@@ -34,3 +34,8 @@ coverage/
 
 # Collector outputs
 collectors/processed_storage/
+collectors/raw_storage/
+collectors/failed_storage/
+
+# Local demo docs (not for repo)
+collectors/PROTOTYPE_DEMO.md
