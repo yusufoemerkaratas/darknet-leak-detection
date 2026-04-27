@@ -18,6 +18,7 @@ from backend.models import AnalysisResult, LeakRecord, Source, Company
 from analysis.detectors.credential_detector import CredentialDetector
 from analysis.detectors.terminology_detector import TerminologyDetector
 from analysis.detectors.company_detector import CompanyDetector
+from parser import ParserSelector
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -40,7 +41,8 @@ def _load_company_profiles() -> list:
     except Exception:
         return []
 
-_company_detector = CompanyDetector(_load_company_profiles())
+_company_detector  = CompanyDetector(_load_company_profiles())
+_parser_selector   = ParserSelector()
 
 
 # ---------------------------------------------------------------------------
@@ -178,22 +180,26 @@ def process_file(db, filepath: Path) -> bool:
         with open(filepath, "r", encoding="utf-8") as f:
             doc = json.load(f)
 
-        content_hash = doc.get("content_hash")
+        # Parse and clean raw document
+        parsed = _parser_selector.parse(doc)
+        if parsed is None:
+            logger.warning(f"[pipeline] {filepath.name}: parser returned None — moving to failed_storage")
+            return False
 
-        # Duplicate check
+        content_hash   = parsed.content_hash
+        full_body_text = parsed.body
+
+        # Duplicate check (on cleaned body hash)
         existing = db.query(LeakRecord).filter(
             LeakRecord.content_hash == content_hash
         ).first()
         if existing:
             return True  # Already processed, safe to delete
 
-        # Validation: full_body_text is required
-        full_body_text = doc.get("full_body_text", "").strip()
-        if not full_body_text:
-            logger.warning(f"[pipeline] {filepath.name}: full_body_text empty — moving to failed_storage")
-            return False
+        if parsed.is_spam:
+            logger.info(f"[pipeline] {filepath.name}: noise_score={parsed.noise_score} — storing with spam flag")
 
-        # Extract metadata
+        # Extract metadata from cleaned body
         email_count    = _extract_email_count(full_body_text)
         estimated_size = _extract_size_mb(full_body_text)
 
@@ -204,15 +210,15 @@ def process_file(db, filepath: Path) -> bool:
         company = get_or_create_company(db, "Unknown")
 
         # Date
-        published_at = parse_date(doc.get("timestamp"))
-        collected_at = parse_date(doc.get("fetched_at"))
+        published_at = parse_date(doc.get("timestamp") or parsed.timestamp)
+        collected_at = parse_date(doc.get("fetched_at") or parsed.parsed_at)
 
         record = LeakRecord(
             source_id         = source.id,
             company_id        = company.id,
-            title             = doc.get("title", "Untitled")[:255],
+            title             = parsed.title,
             content_hash      = content_hash,
-            raw_url           = doc.get("thread_url") or doc.get("source_url") or "",
+            raw_url           = parsed.url or doc.get("source_url") or "",
             severity          = "Medium",
             published_at      = published_at,
             collected_at      = collected_at,
@@ -226,8 +232,15 @@ def process_file(db, filepath: Path) -> bool:
         db.commit()
         db.refresh(record)
 
-        analysis_text = _build_analysis_text(doc)
-        detected = _serialize_detection_results(analysis_text)
+        # Combine pattern detection with parser metadata
+        detected = _serialize_detection_results(full_body_text)
+        detected["parser"] = {
+            "language":      parsed.language,
+            "is_code":       parsed.is_code,
+            "code_language": parsed.code_language,
+            "is_spam":       parsed.is_spam,
+            "noise_score":   parsed.noise_score,
+        }
 
         analysis_result = AnalysisResult(
             leak_record_id    = record.id,
