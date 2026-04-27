@@ -1,11 +1,44 @@
-version: "3.8"
-
 services:
+  db:
+    image: postgres:15
+    container_name: datenleck_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: datenleck_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    container_name: datenleck_backend
+    restart: always
+    depends_on:
+      - db
+    ports:
+      - "62001:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:password@db:5432/datenleck_db
+    env_file:
+      - .env
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
   frontend:
     build: ./frontend
+    container_name: datenleck_frontend
+    restart: always
+    depends_on:
+      - backend
     ports:
-      - "5173:5173"
+      - "62000:5173"
     volumes:
       - ./frontend:/app
+      - /app/node_modules
     working_dir: /app
-    command: npm run dev
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+
+volumes:
+  postgres_data:
