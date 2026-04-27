@@ -24,7 +24,7 @@ services:
       DATABASE_URL: postgresql+psycopg2://postgres:password@db:5432/datenleck_db
     env_file:
       - .env
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
 
   frontend:
     build: ./frontend
@@ -40,5 +40,39 @@ services:
     working_dir: /app
     command: npm run dev -- --host 0.0.0.0 --port 5173
 
+  tor:
+    image: peterdavehello/tor-socks-proxy:latest
+    container_name: datenleck_tor
+    restart: always
+    ports:
+      - "9050:9050"
+
+  collector:
+    build:
+      context: .
+      dockerfile: collectors/Dockerfile
+    container_name: datenleck_collector
+    restart: always
+    depends_on:
+      - db
+      - backend
+      - tor
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:password@db:5432/datenleck_db
+      TOR_HOST: tor
+      TOR_PORT: 9050
+      OLLAMA_URL: http://host-gateway:11434
+    env_file:
+      - .env
+    volumes:
+      - collector_raw:/app/collectors/raw_storage
+      - collector_processed:/app/collectors/processed_storage
+      - collector_failed:/app/collectors/failed_storage
+    extra_hosts:
+      - "host-gateway:host-gateway"
+
 volumes:
   postgres_data:
+  collector_raw:
+  collector_processed:
+  collector_failed:
