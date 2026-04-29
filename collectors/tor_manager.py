@@ -1,6 +1,7 @@
 # collectors/tor_manager.py
 
 import os
+import socket
 
 from stem import Signal
 from stem.control import Controller
@@ -14,8 +15,13 @@ logger = logging.getLogger(__name__)
 # Suppress stem's noisy SocketClosed warnings from the background reader thread
 logging.getLogger("stem").setLevel(logging.ERROR)
 
-# Allow overriding Tor host via env var (Docker: TOR_HOST=tor, local: 127.0.0.1)
-_DEFAULT_TOR_HOST = os.environ.get("TOR_HOST", "127.0.0.1")
+# Allow overriding Tor host/ports via env vars
+# Docker:  TOR_HOST=tor  TOR_SOCKS_PORT=9150
+# Local:   defaults → 127.0.0.1:9050
+_DEFAULT_TOR_HOST         = os.environ.get("TOR_HOST", "127.0.0.1")
+_DEFAULT_SOCKS_PORT       = int(os.environ.get("TOR_SOCKS_PORT", os.environ.get("TOR_PORT", "9050")))
+_DEFAULT_CONTROL_PORT     = int(os.environ.get("TOR_CONTROL_PORT", "9051"))
+_DEFAULT_CONTROL_PASSWORD = os.environ.get("TOR_CONTROL_PASSWORD") or None
 
 
 class TorManager:
@@ -23,20 +29,20 @@ class TorManager:
     Tor network integration for anonymized web requests.
     """
 
-    def __init__(self, socks_host=None, socks_port=9050, control_port=9051, control_password=None, rotate_every=50):
+    def __init__(self, socks_host=None, socks_port=None, control_port=None, control_password=None, rotate_every=50):
         self.socks_host = socks_host or _DEFAULT_TOR_HOST
         """
         Initialize TorManager
 
         Args:
-            socks_port: SOCKS proxy port (default: 9050)
-            control_port: Tor control port (default: 9051)
+            socks_port: SOCKS proxy port (default: env TOR_SOCKS_PORT or 9050)
+            control_port: Tor control port (default: env TOR_CONTROL_PORT or 9051)
             control_password: Tor control port password (optional, for HashedControlPassword)
             rotate_every: Auto-rotate circuit after this many requests (default: 50)
         """
-        self.socks_port = socks_port
-        self.control_port = control_port
-        self.control_password = control_password
+        self.socks_port = socks_port if socks_port is not None else _DEFAULT_SOCKS_PORT
+        self.control_port = control_port if control_port is not None else _DEFAULT_CONTROL_PORT
+        self.control_password = control_password if control_password is not None else _DEFAULT_CONTROL_PASSWORD
         self.rotate_every = rotate_every
         self._request_count = 0
         self.controller = None
@@ -47,15 +53,17 @@ class TorManager:
 
     def _connect_to_tor(self):
         """
-        Connect to Tor control port. Raises if Tor is not reachable.
+        Connect to Tor control port. Logs a warning if unavailable (e.g. Docker image without control port).
         """
         try:
-            self.controller = Controller.from_port(address=self.socks_host, port=self.control_port)
+            # stem requires an IP address, not a hostname
+            resolved = socket.gethostbyname(self.socks_host)
+            self.controller = Controller.from_port(address=resolved, port=self.control_port)
             self.controller.authenticate(password=self.control_password)
             logger.info("✓ Connected to Tor Control Port")
         except Exception as e:
-            logger.error(f"✗ Failed to connect to Tor: {e}")
-            raise
+            logger.warning(f"✗ Tor control port unavailable (circuit rotation disabled): {e}")
+            self.controller = None
 
     def _reconnect(self, max_attempts=3):
         """

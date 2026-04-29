@@ -16,7 +16,7 @@
 import hashlib
 import json
 import logging
-import re
+import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,7 +27,9 @@ logger = logging.getLogger(__name__)
 _STORAGE_ROOT = Path(__file__).parent / "raw_storage"
 _HASH_INDEX   = _STORAGE_ROOT / "seen_hashes.json"
 
-SOCKS_PROXY = "socks5://127.0.0.1:9050"
+_TOR_HOST   = os.environ.get("TOR_HOST", "127.0.0.1")
+_TOR_PORT   = os.environ.get("TOR_SOCKS_PORT", os.environ.get("TOR_PORT", "9050"))
+SOCKS_PROXY = f"socks5://{_TOR_HOST}:{_TOR_PORT}"
 
 # ---------------------------------------------------------------------------
 # Storage helpers (same format as darknet_forum_collector_authenticated.py)

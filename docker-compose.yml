@@ -11,13 +11,20 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d datenleck_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   backend:
     build: ./backend
     container_name: datenleck_backend
     restart: always
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - "62001:8000"
     environment:
@@ -41,11 +48,12 @@ services:
     command: npm run dev -- --host 0.0.0.0 --port 5173
 
   tor:
-    image: peterdavehello/tor-socks-proxy:latest
+    build: ./tor
     container_name: datenleck_tor
     restart: always
     ports:
       - "9050:9050"
+      - "9051:9051"
 
   collector:
     build:
@@ -54,13 +62,18 @@ services:
     container_name: datenleck_collector
     restart: always
     depends_on:
-      - db
-      - backend
-      - tor
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_started
+      tor:
+        condition: service_started
     environment:
       DATABASE_URL: postgresql+psycopg2://postgres:password@db:5432/datenleck_db
       TOR_HOST: tor
-      TOR_PORT: 9050
+      TOR_SOCKS_PORT: 9050
+      TOR_CONTROL_PORT: 9051
+      TOR_CONTROL_PASSWORD: datenleck2024
       OLLAMA_URL: http://host-gateway:11434
     env_file:
       - .env

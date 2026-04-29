@@ -16,7 +16,7 @@ from typing import Optional
 from bs4 import BeautifulSoup
 from faker import Faker
 
-from .captcha_solver import CaptchaSolver, CaptchaType
+from captcha_solver import CaptchaSolver, CaptchaType
 
 logger = logging.getLogger(__name__)
 fake = Faker()
