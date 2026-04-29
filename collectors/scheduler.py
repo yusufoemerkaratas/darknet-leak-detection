@@ -5,6 +5,7 @@ from pathlib import Path
 
 from darknet_forum_collector_authenticated import AuthenticatedForumCollector, load_config
 from js_collector import SPALeakCollector
+from ransomwatch_collector import RansomwatchCollector
 from ingestion_pipeline import run_pipeline
 
 import os
@@ -54,6 +55,14 @@ def job():
                 collector.close()
     except Exception as e:
         logger.error(f"Config load or collector error: {e}")
+
+    # Clearnet: Ransomwatch public feed (no Tor, no login)
+    try:
+        rw = RansomwatchCollector()
+        rw.run()
+        rw.close()
+    except Exception as e:
+        logger.error(f"[ransomwatch] Collector error: {e}")
 
     logger.info("Scraping completed. Starting ingestion pipeline...")
 

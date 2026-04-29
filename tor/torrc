@@ -1,0 +1,5 @@
+SocksPort 0.0.0.0:9050
+ControlPort 0.0.0.0:9051
+HashedControlPassword 16:4192D81E7E0AFE436060C7FFFDD72FCF2EDFB179BB5169F8E45F1E2A8D
+Log notice stdout
+DataDirectory /var/lib/tor
