@@ -241,6 +241,74 @@ forums:
       enabled: true
       captcha: image  # Trigger Ollama LLaVA
 
+  - id: cracked_io
+    name: "Cracked.io"
+    enabled: true
+    base_url: "https://cracked.io"
+    clearnet_url: "https://cracked.io"
+
+    auth:
+      type: form
+      login_url: "/member.php?action=login"
+      login_method: POST
+      fields:
+        username: "${CRACKED_USER}"
+        password: "${CRACKED_PASS}"
+      success_indicator: "Logout"
+
+    account_generation:
+      enabled: false # Cloudflare koruması nedeniyle manuel hesap daha güvenli
+
+    sections:
+      - name: "Leaks Center"
+        url: "/forum-68"
+        enabled: true
+      - name: "Databases"
+        url: "/forum-46"
+        enabled: true
+
+    selectors:
+      post_list: "tr.inline_row"
+      post_item: "tr.inline_row"
+      title: "span.subject_new a"
+      author: "div.author a"
+      timestamp: "span.lastpost"
+      body: ".post_content"
+      next_page: "a.pagination_next"
+
+    rate_limit:
+      min_delay: 5.0
+      max_delay: 15.0 # Clearnet'te Cloudflare daha katıdır, yavaş olmalı
+
+  
+  - id: wilders_security
+    name: "Wilders Security"
+    enabled: true
+    base_url: "https://www.wilderssecurity.com"
+
+    auth:
+      type: none # Haber takibi için login gerekmiyor, sunumda hata riskini sıfırlar
+
+    sections:
+      - name: "Privacy & Data Protection"
+        url: "/forums/privacy-data-protection-and-encryption.40/"
+        enabled: true
+
+    selectors:
+      post_list: "li.structItem"
+      title: "div.structItem-title a"
+      author: "a.username"
+      timestamp: "time.u-dt"
+      next_page: "a.pageNav-jump--next"
+
+    pre_filter:
+      keywords:
+        - "breach"
+        - "hacked"
+        - "ransomware"
+        - "leak"
+        - "security"
+
   - id: exploit_in
     name: "Exploit.in"
     enabled: true
