@@ -18,9 +18,10 @@ logging.getLogger("stem").setLevel(logging.ERROR)
 # Allow overriding Tor host/ports via env vars
 # Docker:  TOR_HOST=tor  TOR_SOCKS_PORT=9150
 # Local:   defaults → 127.0.0.1:9050
-_DEFAULT_TOR_HOST     = os.environ.get("TOR_HOST", "127.0.0.1")
-_DEFAULT_SOCKS_PORT   = int(os.environ.get("TOR_SOCKS_PORT", os.environ.get("TOR_PORT", "9050")))
-_DEFAULT_CONTROL_PORT = int(os.environ.get("TOR_CONTROL_PORT", "9051"))
+_DEFAULT_TOR_HOST         = os.environ.get("TOR_HOST", "127.0.0.1")
+_DEFAULT_SOCKS_PORT       = int(os.environ.get("TOR_SOCKS_PORT", os.environ.get("TOR_PORT", "9050")))
+_DEFAULT_CONTROL_PORT     = int(os.environ.get("TOR_CONTROL_PORT", "9051"))
+_DEFAULT_CONTROL_PASSWORD = os.environ.get("TOR_CONTROL_PASSWORD") or None
 
 
 class TorManager:
@@ -41,7 +42,7 @@ class TorManager:
         """
         self.socks_port = socks_port if socks_port is not None else _DEFAULT_SOCKS_PORT
         self.control_port = control_port if control_port is not None else _DEFAULT_CONTROL_PORT
-        self.control_password = control_password
+        self.control_password = control_password if control_password is not None else _DEFAULT_CONTROL_PASSWORD
         self.rotate_every = rotate_every
         self._request_count = 0
         self.controller = None
