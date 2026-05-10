@@ -1,12 +1,8 @@
-import Header from './components/Header'
+import './App.css'
+import Layout from './components/Layout'
 
 function App() {
-  return (
-    <div>
-      <Header />
-      <p>Frontend is working</p>
-    </div>
-  )
+  return <Layout />
 }
 
 export default App
