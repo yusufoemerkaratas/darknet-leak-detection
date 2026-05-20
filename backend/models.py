@@ -18,6 +18,12 @@ class Source(Base):
 class Company(Base):
     __tablename__ = "companies"
 
+    alerts = relationship(
+    "Alert",
+    back_populates="company",
+    cascade="all, delete-orphan",
+    )
+
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), index=True, nullable=False)
     leak_records = relationship("LeakRecord", back_populates="company", cascade="all, delete-orphan")
@@ -32,6 +38,12 @@ class LeakRecord(Base):
         Index("ix_leak_records_company_id", "company_id"),
         Index("ix_leak_records_published_collected", "published_at", "collected_at"),
     )
+
+    alerts = relationship(
+    "Alert",
+    back_populates="leak_record",
+    cascade="all, delete-orphan",
+    )   
 
     id = Column(Integer, primary_key=True, index=True)
     source_id = Column(Integer, ForeignKey("sources.id", ondelete="CASCADE"), nullable=False)
@@ -51,18 +63,25 @@ class LeakRecord(Base):
     source = relationship("Source", back_populates="leak_records")
     company = relationship("Company", back_populates="leak_records")
     analysis_result = relationship("AnalysisResult", back_populates="leak_record", uselist=False, cascade="all, delete-orphan")
-
+    risk_score = Column(Integer, default=0, nullable=False)
+    classification = Column(String(32), default="irrelevant", nullable=False)
 
 class AnalysisResult(Base):
     __tablename__ = "analysis_result"
 
     id = Column(Integer, primary_key=True, index=True)
     leak_record_id = Column(Integer, ForeignKey("leak_records.id", ondelete="CASCADE"), nullable=False, unique=True)
+
     detected_patterns = Column(JSON, nullable=False, default=dict)
+
+    matched_companies = Column(JSON, nullable=False, default=list)
+    terminology_hits = Column(JSON, nullable=False, default=list)
+    score_contributors = Column(JSON, nullable=False, default=dict)
+    classification_rule = Column(Text, nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     leak_record = relationship("LeakRecord", back_populates="analysis_result")
-
 
 class CrawlJob(Base):
     __tablename__ = "crawl_jobs"
@@ -83,3 +102,40 @@ class CrawlJob(Base):
 
     started_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     finished_at = Column(DateTime(timezone=True), nullable=True)
+
+class Alert(Base):
+    __tablename__ = "alerts"
+
+    __table_args__ = (
+        Index("ix_alerts_severity", "severity"),
+        Index("ix_alerts_company_id", "company_id"),
+        Index("ix_alerts_created_at", "created_at"),
+        Index("ix_alerts_is_reviewed", "is_reviewed"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    leak_record_id = Column(
+        Integer,
+        ForeignKey("leak_records.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    company_id = Column(
+        Integer,
+        ForeignKey("companies.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    severity = Column(String(32), nullable=False)
+
+    is_reviewed = Column(Boolean, default=False, nullable=False)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    leak_record = relationship("LeakRecord", back_populates="alerts")
+    company = relationship("Company", back_populates="alerts")
