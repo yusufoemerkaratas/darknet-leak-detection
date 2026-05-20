@@ -71,6 +71,9 @@ class FindingOut(BaseModel):
 
 
 class FindingDetailOut(FindingOut):
+    is_reviewed: Optional[bool] = None
+    is_false_positive: Optional[bool] = None
+    review_notes: Optional[str] = None
     analysis_result: Optional[AnalysisResultOut] = None
 
 

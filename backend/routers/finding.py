@@ -164,14 +164,17 @@ def get_finding_detail(
     )
 
     return {
-        "id": finding.id,
-        "title": finding.title,
-        "company": company.name if company else None,
-        "classification": finding.classification,
-        "risk_score": finding.risk_score,
-        "severity": finding.severity,
-        "created_at": finding.collected_at,
-        "analysis_result": finding.analysis_result,
+    "id": finding.id,
+    "title": finding.title,
+    "company": finding.company.name if finding.company else "Unknown",
+    "classification": finding.classification,
+    "risk_score": finding.risk_score,
+    "severity": finding.severity,
+    "created_at": finding.collected_at,
+    "analysis_result": finding.analysis_result,
+    "is_reviewed": finding.is_reviewed,
+    "is_false_positive": finding.is_false_positive,
+    "review_notes": finding.review_notes
     }
 
 
@@ -190,6 +193,7 @@ def mark_finding_reviewed(
     if not finding:
         return {"error": "Finding not found"}
 
+    finding.is_reviewed = True
     finding.is_analyzed = True
 
     if review_notes:
@@ -221,6 +225,7 @@ def mark_false_positive(
         return {"error": "Finding not found"}
 
     finding.is_false_positive = True
+    finding.is_reviewed = True
     finding.is_analyzed = True
     finding.review_notes = review_notes
 

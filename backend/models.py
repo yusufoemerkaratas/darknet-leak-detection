@@ -57,6 +57,7 @@ class LeakRecord(Base):
     raw_content_text = Column(Text, nullable=True)
     is_analyzed = Column(Boolean, default=False, nullable=False)
     is_false_positive = Column(Boolean, default=False, nullable=False)
+    is_reviewed = Column(Boolean, default=False, nullable=False)
     review_notes = Column(Text, nullable=True)
     detected_links = Column(JSONB, nullable=True)
     email_count = Column(Integer, nullable=True)
