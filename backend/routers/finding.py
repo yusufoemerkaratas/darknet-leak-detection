@@ -25,6 +25,8 @@ def list_findings(
     is_reviewed: bool | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
+    sort_by: str = Query(default="timestamp", pattern="^(score|timestamp)$"),
+    sort_order: str = Query(default="desc", pattern="^(asc|desc)$"),
     page: int = Query(default=1, ge=1),
     size: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -58,8 +60,11 @@ def list_findings(
 
     total = query.count()
 
+    sort_column = LeakRecord.risk_score if sort_by == "score" else LeakRecord.collected_at
+    order = sort_column.asc() if sort_order == "asc" else sort_column.desc()
+
     findings = (
-        query.order_by(LeakRecord.collected_at.desc())
+        query.order_by(order)
         .offset((page - 1) * size)
         .limit(size)
         .all()
