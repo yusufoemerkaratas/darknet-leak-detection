@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
-from models import Alert, LeakRecord
+from models import Alert, AnalysisResult, LeakRecord
 
 
 ALERT_CLASSIFICATIONS = {"suspicious", "high-risk"}
@@ -21,7 +21,8 @@ def calculate_severity(score: int) -> str | None:
 def is_duplicate_within_7_days(db: Session, finding: LeakRecord) -> bool:
     seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
 
-    existing = (
+    # Same content_hash within 7 days
+    same_hash = (
         db.query(LeakRecord)
         .filter(
             LeakRecord.id != finding.id,
@@ -30,8 +31,31 @@ def is_duplicate_within_7_days(db: Session, finding: LeakRecord) -> bool:
         )
         .first()
     )
+    if same_hash is not None:
+        return True
 
-    return existing is not None
+    # Same company + overlapping detected_patterns within 7 days (related variant)
+    if finding.analysis_result and finding.analysis_result.detected_patterns:
+        finding_patterns = set(finding.analysis_result.detected_patterns.keys())
+
+        recent_same_company = (
+            db.query(LeakRecord)
+            .join(AnalysisResult, AnalysisResult.leak_record_id == LeakRecord.id)
+            .filter(
+                LeakRecord.id != finding.id,
+                LeakRecord.company_id == finding.company_id,
+                LeakRecord.collected_at >= seven_days_ago,
+            )
+            .all()
+        )
+
+        for other in recent_same_company:
+            if other.analysis_result and other.analysis_result.detected_patterns:
+                other_patterns = set(other.analysis_result.detected_patterns.keys())
+                if finding_patterns & other_patterns:
+                    return True
+
+    return False
 
 
 def should_create_alert(db: Session, finding: LeakRecord) -> bool:
