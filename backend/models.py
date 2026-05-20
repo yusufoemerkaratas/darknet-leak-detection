@@ -56,6 +56,8 @@ class LeakRecord(Base):
     collected_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     raw_content_text = Column(Text, nullable=True)
     is_analyzed = Column(Boolean, default=False, nullable=False)
+    is_false_positive = Column(Boolean, default=False, nullable=False)
+    review_notes = Column(Text, nullable=True)
     detected_links = Column(JSONB, nullable=True)
     email_count = Column(Integer, nullable=True)
     estimated_size_mb = Column(Numeric(precision=12, scale=2), nullable=True)

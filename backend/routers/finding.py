@@ -142,3 +142,138 @@ def list_alerts(
         "total": total,
         "items": result,
     }
+
+@router.get("/{finding_id}")
+def get_finding_detail(
+    finding_id: int,
+    db: Session = Depends(get_db),
+):
+    finding = (
+        db.query(LeakRecord)
+        .filter(LeakRecord.id == finding_id)
+        .first()
+    )
+
+    if not finding:
+        return {"error": "Finding not found"}
+
+    company = (
+        db.query(Company)
+        .filter(Company.id == finding.company_id)
+        .first()
+    )
+
+    return {
+        "id": finding.id,
+        "title": finding.title,
+        "company": company.name if company else None,
+        "classification": finding.classification,
+        "risk_score": finding.risk_score,
+        "severity": finding.severity,
+        "created_at": finding.collected_at,
+        "analysis_result": finding.analysis_result,
+    }
+
+
+@router.patch("/{finding_id}/review")
+def mark_finding_reviewed(
+    finding_id: int,
+    review_notes: str | None = None,
+    db: Session = Depends(get_db),
+):
+    finding = (
+        db.query(LeakRecord)
+        .filter(LeakRecord.id == finding_id)
+        .first()
+    )
+
+    if not finding:
+        return {"error": "Finding not found"}
+
+    finding.is_analyzed = True
+
+    if review_notes:
+        finding.review_notes = review_notes
+
+    db.commit()
+    db.refresh(finding)
+
+    return {
+        "id": finding.id,
+        "is_reviewed": True,
+        "review_notes": review_notes,
+    }
+
+
+@router.patch("/{finding_id}/false-positive")
+def mark_false_positive(
+    finding_id: int,
+    review_notes: str,
+    db: Session = Depends(get_db),
+):
+    finding = (
+        db.query(LeakRecord)
+        .filter(LeakRecord.id == finding_id)
+        .first()
+    )
+
+    if not finding:
+        return {"error": "Finding not found"}
+
+    finding.is_false_positive = True
+    finding.is_analyzed = True
+    finding.review_notes = review_notes
+
+    db.commit()
+    db.refresh(finding)
+
+    return {
+        "id": finding.id,
+        "is_false_positive": True,
+        "review_notes": review_notes,
+    }
+
+
+@router.get("/stats/findings-by-severity")
+def findings_by_severity(
+    db: Session = Depends(get_db),
+):
+    critical = (
+        db.query(LeakRecord)
+        .filter(LeakRecord.risk_score >= 90)
+        .count()
+    )
+
+    medium = (
+        db.query(LeakRecord)
+        .filter(
+            LeakRecord.risk_score >= 75,
+            LeakRecord.risk_score <= 89,
+        )
+        .count()
+    )
+
+    low = (
+        db.query(LeakRecord)
+        .filter(
+            LeakRecord.risk_score >= 60,
+            LeakRecord.risk_score <= 74,
+        )
+        .count()
+    )
+
+    high = (
+        db.query(LeakRecord)
+        .filter(
+            LeakRecord.risk_score >= 75,
+            LeakRecord.risk_score <= 100,
+        )
+        .count()
+    )
+
+    return {
+        "critical": critical,
+        "high": high,
+        "medium": medium,
+        "low": low,
+    }
