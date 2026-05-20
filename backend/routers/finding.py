@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -21,6 +23,8 @@ def list_findings(
     classification: str | None = None,
     min_score: int | None = None,
     is_reviewed: bool | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
     page: int = Query(default=1, ge=1),
     size: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -45,6 +49,12 @@ def list_findings(
         query = query.filter(
             LeakRecord.is_reviewed == is_reviewed
         )
+
+    if date_from is not None:
+        query = query.filter(LeakRecord.collected_at >= date_from)
+
+    if date_to is not None:
+        query = query.filter(LeakRecord.collected_at <= date_to)
 
     total = query.count()
 
@@ -87,6 +97,8 @@ def list_alerts(
     severity: str | None = None,
     company_id: int | None = None,
     is_reviewed: bool | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
     page: int = Query(default=1, ge=1),
     size: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -102,6 +114,12 @@ def list_alerts(
 
     if is_reviewed is not None:
         query = query.filter(Alert.is_reviewed == is_reviewed)
+
+    if date_from is not None:
+        query = query.filter(Alert.created_at >= date_from)
+
+    if date_to is not None:
+        query = query.filter(Alert.created_at <= date_to)
 
     total = query.count()
 
