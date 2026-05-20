@@ -117,6 +117,5 @@ class FalsePositiveRequest(BaseModel):
 
 class SeverityStatsOut(BaseModel):
     critical: int
-    high: int
     medium: int
     low: int

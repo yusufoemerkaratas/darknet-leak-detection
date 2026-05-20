@@ -267,18 +267,8 @@ def findings_by_severity(
         .count()
     )
 
-    high = (
-        db.query(LeakRecord)
-        .filter(
-            LeakRecord.risk_score >= 75,
-            LeakRecord.risk_score <= 100,
-        )
-        .count()
-    )
-
     return {
         "critical": critical,
-        "high": high,
         "medium": medium,
         "low": low,
     }
