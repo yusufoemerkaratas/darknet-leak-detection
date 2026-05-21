@@ -4,14 +4,14 @@ from sqlalchemy.orm import Session
 
 from db import SessionLocal
 from models import LeakRecord, Source
-from routers import source, company, crawl_job
+from routers import source, company, crawl_job, finding
 
 app = FastAPI(title="Datenleck API", version="1.0.0")
 
 app.include_router(source.router)
 app.include_router(company.router)
 app.include_router(crawl_job.router)
-
+app.include_router(finding.router)
 
 # ---------------------------------------------------------------------------
 # DB dependency
