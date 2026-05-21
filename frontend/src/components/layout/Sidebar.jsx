@@ -11,7 +11,7 @@ import {
   Shield,
   X,
 } from 'lucide-react'
-import { navigationItems, sidebarStatusCards } from '../../data/mockData'
+import { navigationItems } from '../../data/mockData'
 
 const iconMap = {
   dashboard: LayoutDashboard,
@@ -24,7 +24,7 @@ const iconMap = {
   settings: Settings,
 }
 
-function Sidebar({ activeItem, isOpen, onClose, onSelectItem }) {
+function Sidebar({ activeItem, isOpen, onClose, onSelectItem, statusCards = [] }) {
   return (
     <>
       <div
@@ -88,7 +88,7 @@ function Sidebar({ activeItem, isOpen, onClose, onSelectItem }) {
         </nav>
 
         <div className="mt-auto space-y-2 pt-4">
-          {sidebarStatusCards.map((card) => (
+          {statusCards.map((card) => (
             <section className="panel-muted rounded-[12px] p-2.5" key={card.id}>
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300">
                 {card.title}

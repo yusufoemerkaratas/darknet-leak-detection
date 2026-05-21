@@ -9,6 +9,7 @@ function DashboardShell({
   rightPanel,
   searchValue,
   onSearchChange,
+  sidebarStatusCards,
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -32,6 +33,7 @@ function DashboardShell({
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           onSelectItem={handleSelect}
+          statusCards={sidebarStatusCards}
         />
 
         <div className="flex min-w-0 flex-1 flex-col xl:pl-[194px]">

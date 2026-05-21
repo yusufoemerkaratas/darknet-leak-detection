@@ -1,7 +1,7 @@
 import DetectionGaugeChart from '../charts/DetectionGaugeChart'
 import StatusCard from '../cards/StatusCard'
 
-function DetectionEngineStatus() {
+function DetectionEngineStatus({ modelStatus, successRate }) {
   return (
     <StatusCard subtitle="Pipeline status" title="Detection Engine Status">
       <div className="space-y-2">
@@ -10,10 +10,10 @@ function DetectionEngineStatus() {
             <span className="signal-dot h-2 w-2 rounded-full bg-emerald-400" />
             AI Model
           </span>
-          <span className="text-emerald-300">Active</span>
+          <span className="text-emerald-300">{modelStatus}</span>
         </div>
 
-        <DetectionGaugeChart value={98.7} />
+        <DetectionGaugeChart value={successRate} />
       </div>
     </StatusCard>
   )

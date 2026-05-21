@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { startTransition, useEffect, useState } from 'react'
 import {
   Activity,
   BadgeCheck,
@@ -17,15 +17,38 @@ import RecentFindings from '../components/dashboard/RecentFindings'
 import SeverityLegend from '../components/dashboard/SeverityLegend'
 import StatusCard from '../components/cards/StatusCard'
 import DashboardShell from '../components/layout/DashboardShell'
-import {
-  dataSources,
-  findings,
-  liveFeed,
-  timelineData,
-} from '../data/mockData'
+import { getDashboardOverview } from '../api/client'
 import { severityTheme } from '../styles/theme'
 
 const ITEMS_PER_PAGE = 3
+const REFRESH_INTERVAL_MS = 30000
+
+function normalizeSearchTerm(value) {
+  return value.trim().toLowerCase()
+}
+
+function findingMatchesSearch(finding, searchTerm) {
+  if (!searchTerm) return true
+
+  return [
+    finding.company,
+    finding.type,
+    finding.source,
+    finding.affected,
+    finding.status,
+    finding.detectedAt,
+    String(finding.riskScore),
+  ]
+    .join(' ')
+    .toLowerCase()
+    .includes(searchTerm)
+}
+
+function feedMatchesSearch(item, searchTerm) {
+  if (!searchTerm) return true
+
+  return [item.title, item.company, item.time].join(' ').toLowerCase().includes(searchTerm)
+}
 
 function Dashboard() {
   const [activeItem, setActiveItem] = useState('dashboard')
@@ -35,20 +58,75 @@ function Dashboard() {
   const [statusFilter, setStatusFilter] = useState('All Status')
   const [sortBy, setSortBy] = useState('score-desc')
   const [currentPage, setCurrentPage] = useState(1)
+  const [dashboardData, setDashboardData] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+
+  useEffect(() => {
+    let isActive = true
+
+    async function loadDashboard() {
+      setIsLoading(true)
+      setLoadError('')
+
+      try {
+        const data = await getDashboardOverview()
+        if (!isActive) return
+
+        startTransition(() => {
+          setDashboardData(data)
+          setCurrentPage(1)
+        })
+      } catch (error) {
+        if (!isActive) return
+        setLoadError(error.message || 'Failed to load dashboard data.')
+      } finally {
+        if (isActive) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    loadDashboard()
+    const intervalId = window.setInterval(loadDashboard, REFRESH_INTERVAL_MS)
+
+    return () => {
+      isActive = false
+      window.clearInterval(intervalId)
+    }
+  }, [])
+
+  const findings = dashboardData?.findings ?? []
+  const liveFeed = dashboardData?.live_feed ?? []
+  const timelineData = dashboardData?.timeline ?? []
+  const dataSources = dashboardData?.data_sources ?? []
+  const criticalAlertsData = dashboardData?.critical_alerts ?? []
+  const topCompaniesData = dashboardData?.top_companies ?? []
+  const severityBreakdown = dashboardData?.severity_breakdown ?? []
+  const severityLegend = dashboardData?.severity_legend ?? []
+  const sidebarStatusCards = dashboardData?.sidebar_status_cards ?? []
+  const detectionEngine = dashboardData?.detection_engine ?? {
+    model_status: 'Offline',
+    success_rate: 0,
+  }
+  const summary = dashboardData?.summary ?? {
+    total_findings: 0,
+    critical_alerts: 0,
+    reviewed_findings: 0,
+    monitored_companies: 0,
+    latest_collection: 'No scan data',
+  }
+  const normalizedSearchTerm = normalizeSearchTerm(searchValue)
+  const hasActiveSearch = normalizedSearchTerm.length > 0
+  const searchMatchedFindings = findings.filter((finding) =>
+    findingMatchesSearch(finding, normalizedSearchTerm)
+  )
 
   const companyOptions = [...new Set(findings.map((finding) => finding.company))]
 
   const filteredFindings = (() => {
-    const loweredSearch = searchValue.trim().toLowerCase()
-
     return findings.filter((finding) => {
-      const searchMatch =
-        loweredSearch.length === 0 ||
-        [finding.company, finding.type, finding.source, finding.affected]
-          .join(' ')
-          .toLowerCase()
-          .includes(loweredSearch)
-
+      const searchMatch = findingMatchesSearch(finding, normalizedSearchTerm)
       const companyMatch =
         companyFilter === 'All Companies' || finding.company === companyFilter
       const severityMatch =
@@ -87,33 +165,66 @@ function Dashboard() {
     .filter((finding) => finding.severity === 'Critical' || finding.severity === 'High')
     .sort((left, right) => right.riskScore - left.riskScore)
     .slice(0, 3)
+  const alertSource = criticalAlertsData.length > 0 ? criticalAlertsData : criticalAlerts
+  const visibleAlerts = alertSource.filter((alert) =>
+    findingMatchesSearch(alert, normalizedSearchTerm)
+  )
+  const visibleLiveFeed = liveFeed.filter((item) => feedMatchesSearch(item, normalizedSearchTerm))
+  const visibleSummary = hasActiveSearch
+    ? {
+        total_findings: searchMatchedFindings.length,
+        critical_alerts: searchMatchedFindings.filter(
+          (finding) => finding.severity === 'Critical' || finding.severity === 'High'
+        ).length,
+        reviewed_findings: searchMatchedFindings.filter(
+          (finding) => finding.status === 'Reviewed'
+        ).length,
+        monitored_companies: new Set(searchMatchedFindings.map((finding) => finding.company)).size,
+        latest_collection: `Search results for "${searchValue.trim()}"`,
+      }
+    : summary
 
   const severityData = (() => {
-    const counts = ['Critical', 'High', 'Medium', 'Low', 'Info'].map((label) => ({
-      label,
-      value: filteredFindings.filter((finding) => finding.severity === label).length,
-      color: severityTheme[label].chart,
-    }))
+    const counts = ['Critical', 'High', 'Medium', 'Low', 'Info'].map((label) => {
+      const serverValue = severityBreakdown.find((entry) => entry.label === label)?.value
+      const localValue = filteredFindings.filter((finding) => finding.severity === label).length
+
+      return {
+        label,
+        value: hasActiveSearch || companyFilter !== 'All Companies' || severityFilter !== 'All Severity' || statusFilter !== 'All Status'
+          ? localValue
+          : serverValue ?? localValue,
+        color: severityTheme[label].chart,
+      }
+    })
 
     return counts.filter((entry) => entry.value > 0)
   })()
 
-  const topCompanies = [...findings]
-    .sort((left, right) => right.riskScore - left.riskScore)
-    .slice(0, 5)
-    .map((finding) => ({
-      name: finding.company,
-      count: 1,
-      score: finding.riskScore,
-      color: severityTheme[finding.severity].chart,
-    }))
+  const topCompanies =
+    topCompaniesData.length > 0 && !hasActiveSearch
+      ? topCompaniesData.map((company) => ({
+          name: company.name,
+          count: company.count,
+          score: company.score,
+          color: severityTheme[company.severity]?.chart ?? severityTheme.Info.chart,
+        }))
+      : [...(hasActiveSearch ? searchMatchedFindings : findings)]
+          .sort((left, right) => right.riskScore - left.riskScore)
+          .slice(0, 5)
+          .map((finding) => ({
+            name: finding.company,
+            count: 1,
+            score: finding.riskScore,
+            color: severityTheme[finding.severity]?.chart ?? severityTheme.Info.chart,
+          }))
 
   const statCards = [
     {
       icon: Activity,
       label: 'Total Findings',
-      value: findings.length,
-      detail: '+2 since yesterday',
+      value: visibleSummary.total_findings,
+      detail: visibleSummary.latest_collection || 'No scan data',
       accentClass: 'border-cyan-500/20',
       color: '#38bdf8',
       trend: [18, 24, 20, 30],
@@ -121,8 +232,8 @@ function Dashboard() {
     {
       icon: ShieldAlert,
       label: 'Critical Alerts',
-      value: findings.filter((finding) => finding.severity === 'Critical').length,
-      detail: '+1 since yesterday',
+      value: visibleSummary.critical_alerts,
+      detail: 'Immediate review queue',
       accentClass: 'border-rose-500/20',
       color: '#fb7185',
       trend: [12, 18, 16, 28],
@@ -130,8 +241,8 @@ function Dashboard() {
     {
       icon: BadgeCheck,
       label: 'Reviewed',
-      value: findings.filter((finding) => finding.status === 'Reviewed').length,
-      detail: 'Completed reviews',
+      value: visibleSummary.reviewed_findings,
+      detail: 'Analyzed records',
       accentClass: 'border-violet-500/20',
       color: '#a78bfa',
       trend: [10, 12, 18, 22],
@@ -139,7 +250,7 @@ function Dashboard() {
     {
       icon: Building2,
       label: 'Companies',
-      value: companyOptions.length,
+      value: visibleSummary.monitored_companies,
       detail: 'Currently monitored',
       accentClass: 'border-emerald-500/20',
       color: '#4ade80',
@@ -162,10 +273,13 @@ function Dashboard() {
 
   const rightPanel = (
     <>
-      <LiveMonitoringFeed items={liveFeed} />
-      <SeverityLegend />
+      <LiveMonitoringFeed items={visibleLiveFeed} searchValue={searchValue} />
+      <SeverityLegend items={severityLegend} />
       <DataSourcesCard items={dataSources} />
-      <DetectionEngineStatus />
+      <DetectionEngineStatus
+        modelStatus={detectionEngine.model_status}
+        successRate={detectionEngine.success_rate}
+      />
     </>
   )
 
@@ -179,6 +293,7 @@ function Dashboard() {
       onSelectItem={handleSelectItem}
       rightPanel={rightPanel}
       searchValue={searchValue}
+      sidebarStatusCards={sidebarStatusCards}
     >
       <section className="dashboard-fade flex items-center justify-between gap-3" id="dashboard">
         <div>
@@ -190,9 +305,33 @@ function Dashboard() {
           </p>
         </div>
         <div className="hidden rounded-md border border-slate-800 bg-slate-950/60 px-2 py-1 text-[10px] text-slate-300 xl:block">
-          2026-05-04 10:15 UTC
+          {dashboardData?.generated_at
+            ? new Date(dashboardData.generated_at).toLocaleString('en-GB', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : summary.latest_collection || 'No scan data'}
         </div>
       </section>
+
+      {loadError ? (
+        <StatusCard subtitle="API connection" title="Dashboard Data Unavailable">
+          <p className="text-[11px] text-rose-300">
+            {loadError}. Check the backend service and database connection.
+          </p>
+        </StatusCard>
+      ) : null}
+
+      {isLoading ? (
+        <StatusCard subtitle="Loading" title="Syncing Dashboard">
+          <p className="text-[11px] text-slate-400">
+            Pulling live findings, metrics, and source activity from the backend.
+          </p>
+        </StatusCard>
+      ) : null}
 
       <section className="grid grid-cols-2 gap-2 lg:grid-cols-4" id="summary">
         {statCards.map((card, index) => (
@@ -210,13 +349,14 @@ function Dashboard() {
         ))}
       </section>
 
-      <LatestCriticalAlerts alerts={criticalAlerts} />
+      <LatestCriticalAlerts alerts={visibleAlerts} searchValue={searchValue} />
 
       <RecentFindings
         companyFilter={companyFilter}
         companyOptions={companyOptions}
         currentPage={currentPage}
         findings={paginatedFindings}
+        itemsPerPage={ITEMS_PER_PAGE}
         onCompanyFilterChange={(value) => {
           setCompanyFilter(value)
           setCurrentPage(1)

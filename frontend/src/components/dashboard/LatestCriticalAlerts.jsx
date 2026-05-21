@@ -2,7 +2,7 @@ import { AlertOctagon } from 'lucide-react'
 import StatusCard from '../cards/StatusCard'
 import { getSeverityTheme } from '../../styles/theme'
 
-function LatestCriticalAlerts({ alerts }) {
+function LatestCriticalAlerts({ alerts, searchValue }) {
   return (
     <StatusCard
       actionLabel="View All Alerts"
@@ -11,6 +11,14 @@ function LatestCriticalAlerts({ alerts }) {
       title="Latest Critical Alerts"
     >
       <div className="space-y-1.5">
+        {alerts.length === 0 ? (
+          <div className="rounded-[9px] border border-dashed border-slate-800 bg-slate-950/35 px-3 py-3 text-[11px] text-slate-400">
+            {searchValue?.trim()
+              ? `No critical alerts matched "${searchValue.trim()}".`
+              : 'No critical alerts available right now.'}
+          </div>
+        ) : null}
+
         {alerts.map((alert) => {
           const theme = getSeverityTheme(alert.severity)
 

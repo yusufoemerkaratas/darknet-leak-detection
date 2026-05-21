@@ -13,6 +13,7 @@ function FindingsTable({
   onSortByChange,
   companyOptions,
   currentPage,
+  itemsPerPage,
   totalResults,
   totalPages,
   onPageChange,
@@ -87,6 +88,14 @@ function FindingsTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/90">
+            {findings.length === 0 ? (
+              <tr>
+                <td className="px-3 py-6 text-center text-[11px] text-slate-400" colSpan="6">
+                  No findings matched the current search and filters.
+                </td>
+              </tr>
+            ) : null}
+
             {findings.map((finding) => {
               const severityTone = getSeverityTheme(finding.severity)
               const statusTone = getStatusTheme(finding.status)
@@ -128,8 +137,8 @@ function FindingsTable({
 
       <div className="flex flex-col gap-2 text-[11px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
         <p>
-          Showing {findings.length === 0 ? 0 : (currentPage - 1) * 5 + 1} to{' '}
-          {(currentPage - 1) * 5 + findings.length} of {totalResults} results
+          Showing {findings.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to{' '}
+          {(currentPage - 1) * itemsPerPage + findings.length} of {totalResults} results
         </p>
 
         <div className="flex items-center gap-2">

@@ -1,6 +1,6 @@
 import StatusCard from '../cards/StatusCard'
 
-function LiveMonitoringFeed({ items }) {
+function LiveMonitoringFeed({ items, searchValue }) {
   return (
     <StatusCard
       id="sources"
@@ -9,6 +9,14 @@ function LiveMonitoringFeed({ items }) {
       title="Live Monitoring Feed"
     >
       <div className="space-y-2.5">
+        {items.length === 0 ? (
+          <div className="rounded-[12px] border border-dashed border-slate-800 bg-slate-950/35 px-3 py-3 text-[11px] text-slate-400">
+            {searchValue?.trim()
+              ? `No feed events matched "${searchValue.trim()}".`
+              : 'No feed events available right now.'}
+          </div>
+        ) : null}
+
         {items.slice(0, 4).map((item) => (
           <div
             className="data-row flex items-start justify-between gap-3 rounded-[12px] border border-slate-800/80 bg-slate-950/45 p-2.5"
