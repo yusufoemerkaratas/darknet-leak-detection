@@ -1,16 +1,32 @@
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from db import SessionLocal
 from models import LeakRecord, Source
-from routers import source, company, crawl_job
+from routers import source, company, crawl_job, dashboard
 
 app = FastAPI(title="Datenleck API", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:62000",
+        "http://127.0.0.1:62000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(source.router)
 app.include_router(company.router)
 app.include_router(crawl_job.router)
+app.include_router(dashboard.router)
 
 
 # ---------------------------------------------------------------------------
@@ -53,30 +69,43 @@ def stats(db: Session = Depends(get_db)):
       - largest_leak_mb: largest leak size detected (MB)
       - latest_collection: time of the most recent data collection (ISO-8601)
     """
-    total     = db.query(func.count(LeakRecord.id)).scalar() or 0
-    pending   = db.query(func.count(LeakRecord.id)).filter(
-        LeakRecord.is_analyzed == False  # noqa: E712
-    ).scalar() or 0
-    analyzed  = total - pending
+    try:
+        total = db.query(func.count(LeakRecord.id)).scalar() or 0
+        pending = db.query(func.count(LeakRecord.id)).filter(
+            LeakRecord.is_analyzed == False  # noqa: E712
+        ).scalar() or 0
+        analyzed = total - pending
 
-    total_emails  = db.query(func.sum(LeakRecord.email_count)).scalar() or 0
-    largest_leak  = db.query(func.max(LeakRecord.estimated_size_mb)).scalar()
-    latest_ts     = db.query(func.max(LeakRecord.collected_at)).scalar()
+        total_emails = db.query(func.sum(LeakRecord.email_count)).scalar() or 0
+        largest_leak = db.query(func.max(LeakRecord.estimated_size_mb)).scalar()
+        latest_ts = db.query(func.max(LeakRecord.collected_at)).scalar()
 
-    per_source_rows = (
-        db.query(Source.name, func.count(LeakRecord.id).label("count"))
-        .join(LeakRecord, LeakRecord.source_id == Source.id)
-        .group_by(Source.name)
-        .all()
-    )
-    records_per_source = {row.name: row.count for row in per_source_rows}
+        per_source_rows = (
+            db.query(Source.name, func.count(LeakRecord.id).label("count"))
+            .join(LeakRecord, LeakRecord.source_id == Source.id)
+            .group_by(Source.name)
+            .all()
+        )
+        records_per_source = {row.name: row.count for row in per_source_rows}
 
-    return {
-        "total_records":        total,
-        "pending_analysis":     pending,
-        "analyzed":             analyzed,
-        "total_emails_found":   int(total_emails),
-        "largest_leak_mb":      float(largest_leak) if largest_leak else None,
-        "latest_collection":    latest_ts.isoformat() if latest_ts else None,
-        "records_per_source":   records_per_source,
-    }
+        return {
+            "database_status": "online",
+            "total_records": total,
+            "pending_analysis": pending,
+            "analyzed": analyzed,
+            "total_emails_found": int(total_emails),
+            "largest_leak_mb": float(largest_leak) if largest_leak else None,
+            "latest_collection": latest_ts.isoformat() if latest_ts else None,
+            "records_per_source": records_per_source,
+        }
+    except OperationalError:
+        return {
+            "database_status": "offline",
+            "total_records": 0,
+            "pending_analysis": 0,
+            "analyzed": 0,
+            "total_emails_found": 0,
+            "largest_leak_mb": None,
+            "latest_collection": None,
+            "records_per_source": {},
+        }
