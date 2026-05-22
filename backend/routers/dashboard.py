@@ -3,18 +3,20 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, joinedload
 
 from db import get_db
-from models import Company, LeakRecord, Source
+from models import AnalysisResult, Company, LeakRecord, Source
 from schemas import (
+    DashboardFindingDetailOut,
     DashboardCompanyPressureOut,
     DashboardDetectionEngineOut,
     DashboardFeedItemOut,
     DashboardFindingOut,
+    DashboardFindingStatusUpdateIn,
     DashboardOverviewOut,
     DashboardSeverityLegendOut,
     DashboardSeverityOut,
@@ -59,6 +61,137 @@ TYPE_KEYWORDS = {
     "Archive Exposure": ("archive", "backup", "export"),
 }
 
+REVIEW_STATUS_OPTIONS = {
+    "New",
+    "Reviewing",
+    "Reviewed",
+    "False Positive",
+    "Escalated",
+}
+
+PREVIEW_FINDINGS = [
+    {
+        "id": 1,
+        "company": "TechNova GmbH",
+        "type": "Credential Leak",
+        "severity": "Critical",
+        "risk_score": 92,
+        "status": "New",
+        "detected_at_offset": {"minutes": 6},
+        "source": "Paste Site",
+        "affected": "Affected: 312 emails",
+        "title": "Credential leak detected in indexed paste",
+        "summary": "Credential pairs matching the monitored company domain were detected in a newly indexed paste source.",
+        "recommended_action": "Invalidate exposed credentials, force password resets, and review login telemetry for suspicious access attempts.",
+        "raw_url": "https://preview.leakguard.local/paste/technova-credential-leak",
+        "evidence": [
+            "Monitored domain match detected",
+            "Multiple credential-like patterns identified",
+            "Public paste source indexed in preview mode",
+        ],
+    },
+    {
+        "id": 2,
+        "company": "CloudBridge SE",
+        "type": "Password Dump",
+        "severity": "High",
+        "risk_score": 84,
+        "status": "Reviewing",
+        "detected_at_offset": {"minutes": 22},
+        "source": "Leak Database",
+        "affected": "Estimated size: 1.80 MB",
+        "title": "Password dump added to leak database",
+        "summary": "A credential archive associated with the monitored company naming pattern was added to a leak aggregation database.",
+        "recommended_action": "Validate whether the dump contains active credentials, rotate impacted accounts, and correlate usernames with internal identities.",
+        "raw_url": "https://preview.leakguard.local/database/cloudbridge-password-dump",
+        "evidence": [
+            "Archive metadata references company aliases",
+            "Credential dump title indicates password content",
+            "Leak database source has repeated signal history",
+        ],
+    },
+    {
+        "id": 3,
+        "company": "DataStream Corp",
+        "type": "Email Exposure",
+        "severity": "Medium",
+        "risk_score": 67,
+        "status": "Reviewing",
+        "detected_at_offset": {"hours": 1, "minutes": 12},
+        "source": "Dark Web Forum",
+        "affected": "Affected: 128 emails",
+        "title": "Email address set exposed in forum thread",
+        "summary": "A forum post contains a batch of addresses tied to the monitored company and likely originated from a prior export.",
+        "recommended_action": "Notify the affected business owner, monitor phishing activity, and cross-check the exposed addresses against internal user directories.",
+        "raw_url": "https://preview.leakguard.local/forum/datastream-email-exposure",
+        "evidence": [
+            "Company domain found in leaked address list",
+            "Forum thread references internal mailing segments",
+            "Sample records show repeated employee aliases",
+        ],
+    },
+    {
+        "id": 4,
+        "company": "SecureNet Ltd",
+        "type": "Database Leak",
+        "severity": "Critical",
+        "risk_score": 95,
+        "status": "New",
+        "detected_at_offset": {"hours": 3, "minutes": 8},
+        "source": "Breach Archive",
+        "affected": "Estimated size: 5.30 MB",
+        "title": "Structured database archive published",
+        "summary": "A structured data archive with company-specific markers was published in a breach archive and scored as critical.",
+        "recommended_action": "Escalate to incident response, preserve evidence, and confirm whether database records contain active customer or employee data.",
+        "raw_url": "https://preview.leakguard.local/archive/securenet-database-leak",
+        "evidence": [
+            "Archive filename contains company identifier",
+            "Row count estimate indicates structured export",
+            "Source reputation marked as high-risk breach archive",
+        ],
+    },
+    {
+        "id": 5,
+        "company": "Alpha Solutions",
+        "type": "API Key Exposure",
+        "severity": "Low",
+        "risk_score": 33,
+        "status": "Reviewed",
+        "detected_at_offset": {"hours": 6, "minutes": 17},
+        "source": "Git Mirror",
+        "affected": "Links detected: 2",
+        "title": "API token pattern detected in mirrored repository",
+        "summary": "A mirrored code repository contains a token-shaped string associated with a monitored project namespace.",
+        "recommended_action": "Validate whether the token is still active, rotate if necessary, and add repository secret scanning safeguards.",
+        "raw_url": "https://preview.leakguard.local/git/alpha-api-key",
+        "evidence": [
+            "Token-like pattern matched secret detector",
+            "Repository mirror references monitored project path",
+            "Two related links were collected for analyst review",
+        ],
+    },
+    {
+        "id": 6,
+        "company": "NordStack Labs",
+        "type": "Archive Exposure",
+        "severity": "High",
+        "risk_score": 79,
+        "status": "New",
+        "detected_at_offset": {"hours": 9, "minutes": 45},
+        "source": "Forum Thread",
+        "affected": "Estimated size: 2.40 MB",
+        "title": "Archive exposure referenced in discussion thread",
+        "summary": "A discussion thread links to an exposed archive believed to contain internal exports tied to the monitored company.",
+        "recommended_action": "Review the linked archive, assess data sensitivity, and request takedown or containment actions where possible.",
+        "raw_url": "https://preview.leakguard.local/forum/nordstack-archive-exposure",
+        "evidence": [
+            "Thread title includes company alias",
+            "Linked archive size aligns with exported workspace data",
+            "Follow-up replies confirm archive accessibility",
+        ],
+    },
+]
+
 
 def _format_compact_date(value: Optional[datetime]) -> Optional[str]:
     if value is None:
@@ -74,6 +207,22 @@ def _format_short_time(value: Optional[datetime]) -> str:
 
 def _format_day_label(value: datetime) -> str:
     return value.strftime("%b %d").replace(" 0", " ")
+
+
+def _get_detected_patterns(record: LeakRecord) -> dict:
+    if (
+        record.analysis_result
+        and isinstance(record.analysis_result.detected_patterns, dict)
+    ):
+        return dict(record.analysis_result.detected_patterns)
+    return {}
+
+
+def _get_review_status(record: LeakRecord) -> Optional[str]:
+    review_status = _get_detected_patterns(record).get("review_status")
+    if review_status in REVIEW_STATUS_OPTIONS:
+        return review_status
+    return None
 
 
 def _normalize_severity(value: Optional[str]) -> str:
@@ -114,6 +263,10 @@ def _format_affected(record: LeakRecord) -> str:
 
 
 def _compute_status(record: LeakRecord) -> str:
+    review_status = _get_review_status(record)
+    if review_status:
+        return review_status
+
     severity = (record.severity or "").lower()
     if record.is_analyzed:
         return "Reviewed"
@@ -134,6 +287,49 @@ def _compute_risk_score(record: LeakRecord) -> int:
     return max(1, min(100, score))
 
 
+def _build_threat_explanation(
+    finding_type: str,
+    source: str,
+    affected: str,
+    severity: str,
+) -> str:
+    return (
+        f"The monitoring pipeline classified this event as {finding_type.lower()} with {severity.lower()} severity. "
+        f"Signals collected from {source} and the observed scope ({affected.lower()}) increased the analyst priority for this finding."
+    )
+
+
+def _build_recommended_action(finding_type: str, severity: str) -> str:
+    lowered_type = finding_type.lower()
+    lowered_severity = severity.lower()
+
+    if "credential" in lowered_type or "password" in lowered_type:
+        return "Force credential rotation, review authentication logs, and notify the impacted owner team immediately."
+    if "api" in lowered_type or "token" in lowered_type:
+        return "Rotate exposed keys, audit downstream service usage, and enable stricter repository secret scanning."
+    if "database" in lowered_type:
+        return "Escalate to incident response, validate the archive contents, and assess regulatory notification requirements."
+    if "email" in lowered_type:
+        return "Warn potentially affected users and monitor for phishing or password-spraying activity."
+    if lowered_severity in {"critical", "high"}:
+        return "Prioritize analyst review, preserve the evidence trail, and coordinate containment with the security team."
+    return "Review the evidence, confirm the exposure scope, and document the remediation plan."
+
+
+def _build_evidence_points(
+    finding_type: str,
+    source: str,
+    affected: str,
+    status: str,
+) -> list[str]:
+    return [
+        f"Source observed: {source}",
+        affected,
+        f"Current analyst status: {status}",
+        f"Finding classified as {finding_type}",
+    ]
+
+
 def _serialize_finding(record: LeakRecord) -> DashboardFindingOut:
     detected_at = record.collected_at or record.published_at
 
@@ -147,6 +343,72 @@ def _serialize_finding(record: LeakRecord) -> DashboardFindingOut:
         detected_at=detected_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M"),
         source=record.source.name if record.source else "Unknown Source",
         affected=_format_affected(record),
+    )
+
+
+def _serialize_finding_detail(record: LeakRecord) -> DashboardFindingDetailOut:
+    finding = _serialize_finding(record)
+    title = record.title or finding.type
+    summary = _build_threat_explanation(
+        finding.type,
+        finding.source,
+        finding.affected,
+        finding.severity,
+    )
+
+    return DashboardFindingDetailOut(
+        **finding.model_dump(),
+        title=title,
+        summary=summary,
+        recommended_action=_build_recommended_action(finding.type, finding.severity),
+        raw_url=record.raw_url,
+        published_at=_format_compact_date(record.published_at),
+        evidence=_build_evidence_points(
+            finding.type,
+            finding.source,
+            finding.affected,
+            finding.status,
+        ),
+    )
+
+
+def _preview_detected_at(now: datetime, preview_item: dict) -> datetime:
+    return now - timedelta(**preview_item["detected_at_offset"])
+
+
+def _serialize_preview_finding(
+    preview_item: dict,
+    now: Optional[datetime] = None,
+) -> DashboardFindingOut:
+    reference_now = now or datetime.now(timezone.utc)
+    detected_at = _preview_detected_at(reference_now, preview_item)
+    return DashboardFindingOut(
+        id=preview_item["id"],
+        company=preview_item["company"],
+        type=preview_item["type"],
+        severity=preview_item["severity"],
+        risk_score=preview_item["risk_score"],
+        status=preview_item["status"],
+        detected_at=detected_at.strftime("%Y-%m-%d %H:%M"),
+        source=preview_item["source"],
+        affected=preview_item["affected"],
+    )
+
+
+def _serialize_preview_detail(
+    preview_item: dict,
+    now: Optional[datetime] = None,
+) -> DashboardFindingDetailOut:
+    finding = _serialize_preview_finding(preview_item, now=now)
+    detected_at = _preview_detected_at(now or datetime.now(timezone.utc), preview_item)
+    return DashboardFindingDetailOut(
+        **finding.model_dump(),
+        title=preview_item["title"],
+        summary=preview_item["summary"],
+        recommended_action=preview_item["recommended_action"],
+        raw_url=preview_item["raw_url"],
+        published_at=_format_compact_date(detected_at),
+        evidence=preview_item["evidence"],
     )
 
 
@@ -167,74 +429,11 @@ def _build_feed_title(finding_type: str) -> str:
 
 def _empty_dashboard_overview() -> DashboardOverviewOut:
     now = datetime.now(timezone.utc)
-    fake_findings = [
-        DashboardFindingOut(
-            id=1,
-            company="TechNova GmbH",
-            type="Credential Leak",
-            severity="Critical",
-            risk_score=92,
-            status="New",
-            detected_at=(now - timedelta(minutes=6)).strftime("%Y-%m-%d %H:%M"),
-            source="Paste Site",
-            affected="Affected: 312 emails",
-        ),
-        DashboardFindingOut(
-            id=2,
-            company="CloudBridge SE",
-            type="Password Dump",
-            severity="High",
-            risk_score=84,
-            status="Reviewing",
-            detected_at=(now - timedelta(minutes=22)).strftime("%Y-%m-%d %H:%M"),
-            source="Leak Database",
-            affected="Estimated size: 1.80 MB",
-        ),
-        DashboardFindingOut(
-            id=3,
-            company="DataStream Corp",
-            type="Email Exposure",
-            severity="Medium",
-            risk_score=67,
-            status="Reviewing",
-            detected_at=(now - timedelta(hours=1, minutes=12)).strftime("%Y-%m-%d %H:%M"),
-            source="Dark Web Forum",
-            affected="Affected: 128 emails",
-        ),
-        DashboardFindingOut(
-            id=4,
-            company="SecureNet Ltd",
-            type="Database Leak",
-            severity="Critical",
-            risk_score=95,
-            status="New",
-            detected_at=(now - timedelta(hours=3, minutes=8)).strftime("%Y-%m-%d %H:%M"),
-            source="Breach Archive",
-            affected="Estimated size: 5.30 MB",
-        ),
-        DashboardFindingOut(
-            id=5,
-            company="Alpha Solutions",
-            type="API Key Exposure",
-            severity="Low",
-            risk_score=33,
-            status="Reviewed",
-            detected_at=(now - timedelta(hours=6, minutes=17)).strftime("%Y-%m-%d %H:%M"),
-            source="Git Mirror",
-            affected="Links detected: 2",
-        ),
-        DashboardFindingOut(
-            id=6,
-            company="NordStack Labs",
-            type="Archive Exposure",
-            severity="High",
-            risk_score=79,
-            status="New",
-            detected_at=(now - timedelta(hours=9, minutes=45)).strftime("%Y-%m-%d %H:%M"),
-            source="Forum Thread",
-            affected="Estimated size: 2.40 MB",
-        ),
-    ]
+    fake_findings = [_serialize_preview_finding(item, now=now) for item in PREVIEW_FINDINGS]
+    reviewed_count = sum(1 for item in PREVIEW_FINDINGS if item["status"] == "Reviewed")
+    critical_alerts_count = sum(
+        1 for item in PREVIEW_FINDINGS if item["severity"] in {"Critical", "High"}
+    )
 
     fake_live_feed = [
         DashboardFeedItemOut(
@@ -251,9 +450,9 @@ def _empty_dashboard_overview() -> DashboardOverviewOut:
         generated_at=now.isoformat(),
         summary=DashboardSummaryOut(
             total_findings=len(fake_findings),
-            critical_alerts=3,
-            reviewed_findings=1,
-            monitored_companies=6,
+            critical_alerts=critical_alerts_count,
+            reviewed_findings=reviewed_count,
+            monitored_companies=len({item["company"] for item in PREVIEW_FINDINGS}),
             latest_collection="Preview mode",
         ),
         findings=fake_findings,
@@ -351,6 +550,25 @@ def _empty_dashboard_overview() -> DashboardOverviewOut:
             ),
         ],
     )
+
+
+def _get_preview_finding_by_id(finding_id: int) -> Optional[dict]:
+    for item in PREVIEW_FINDINGS:
+        if item["id"] == finding_id:
+            return item
+    return None
+
+
+def _apply_review_status(record: LeakRecord, status: str) -> None:
+    patterns = _get_detected_patterns(record)
+    patterns["review_status"] = status
+
+    if record.analysis_result:
+        record.analysis_result.detected_patterns = patterns
+    else:
+        record.analysis_result = AnalysisResult(detected_patterns=patterns)
+
+    record.is_analyzed = status in {"Reviewed", "False Positive"}
 
 
 @router.get("/overview", response_model=DashboardOverviewOut)
@@ -546,3 +764,62 @@ def dashboard_overview(db: Session = Depends(get_db)):
         )
     except OperationalError:
         return _empty_dashboard_overview()
+
+
+@router.get("/findings/{finding_id}", response_model=DashboardFindingDetailOut)
+def get_dashboard_finding_detail(finding_id: int, db: Session = Depends(get_db)):
+    try:
+        record = (
+            db.query(LeakRecord)
+            .options(
+                joinedload(LeakRecord.company),
+                joinedload(LeakRecord.source),
+                joinedload(LeakRecord.analysis_result),
+            )
+            .filter(LeakRecord.id == finding_id)
+            .first()
+        )
+        if not record:
+            raise HTTPException(status_code=404, detail="Finding not found")
+        return _serialize_finding_detail(record)
+    except OperationalError:
+        preview_item = _get_preview_finding_by_id(finding_id)
+        if not preview_item:
+            raise HTTPException(status_code=404, detail="Finding not found")
+        return _serialize_preview_detail(preview_item)
+
+
+@router.patch("/findings/{finding_id}/status", response_model=DashboardFindingDetailOut)
+def update_dashboard_finding_status(
+    finding_id: int,
+    payload: DashboardFindingStatusUpdateIn,
+    db: Session = Depends(get_db),
+):
+    if payload.status not in REVIEW_STATUS_OPTIONS:
+        raise HTTPException(status_code=400, detail="Unsupported status value")
+
+    try:
+        record = (
+            db.query(LeakRecord)
+            .options(
+                joinedload(LeakRecord.company),
+                joinedload(LeakRecord.source),
+                joinedload(LeakRecord.analysis_result),
+            )
+            .filter(LeakRecord.id == finding_id)
+            .first()
+        )
+        if not record:
+            raise HTTPException(status_code=404, detail="Finding not found")
+
+        _apply_review_status(record, payload.status)
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        return _serialize_finding_detail(record)
+    except OperationalError:
+        preview_item = _get_preview_finding_by_id(finding_id)
+        if not preview_item:
+            raise HTTPException(status_code=404, detail="Finding not found")
+        preview_item["status"] = payload.status
+        return _serialize_preview_detail(preview_item)

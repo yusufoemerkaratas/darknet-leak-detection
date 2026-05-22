@@ -60,6 +60,15 @@ class DashboardFindingOut(BaseModel):
     affected: str
 
 
+class DashboardFindingDetailOut(DashboardFindingOut):
+    title: str
+    summary: str
+    recommended_action: str
+    raw_url: Optional[str] = None
+    published_at: Optional[str] = None
+    evidence: list[str]
+
+
 class DashboardFeedItemOut(BaseModel):
     id: int
     tone: str
@@ -111,6 +120,10 @@ class DashboardStatusCardOut(BaseModel):
 class DashboardDetectionEngineOut(BaseModel):
     model_status: str
     success_rate: float
+
+
+class DashboardFindingStatusUpdateIn(BaseModel):
+    status: str
 
 
 class DashboardOverviewOut(BaseModel):
