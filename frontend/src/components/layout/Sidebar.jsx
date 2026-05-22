@@ -1,5 +1,6 @@
 import {
   Activity,
+  ArrowRight,
   BarChart3,
   Bell,
   Building2,
@@ -7,11 +8,10 @@ import {
   FileText,
   LayoutDashboard,
   SearchCheck,
-  Settings,
   Shield,
   X,
 } from 'lucide-react'
-import { navigationItems } from '../../data/mockData'
+import { navigationItems, rightPanelItems } from '../../data/mockData'
 
 const iconMap = {
   dashboard: LayoutDashboard,
@@ -21,10 +21,18 @@ const iconMap = {
   sources: Database,
   visualizations: BarChart3,
   reports: FileText,
-  settings: Settings,
+  'monitoring-feed': Bell,
+  'severity-legend': BarChart3,
+  'data-sources-panel': Database,
+  'engine-status-panel': Activity,
 }
 
 function Sidebar({ activeItem, isOpen, onClose, onSelectItem, statusCards = [] }) {
+  const primaryStatusCard = statusCards.find((card) => card.id === 'system-status')
+  const liveMonitoringRow = primaryStatusCard?.rows.find(
+    (row) => row.label === 'Live Monitoring'
+  )
+
   return (
     <>
       <div
@@ -87,33 +95,54 @@ function Sidebar({ activeItem, isOpen, onClose, onSelectItem, statusCards = [] }
           })}
         </nav>
 
-        <div className="mt-auto space-y-2 pt-4">
-          {statusCards.map((card) => (
-            <section className="panel-muted rounded-[12px] p-2.5" key={card.id}>
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300">
-                {card.title}
-              </p>
+        <div className="mt-4 border-t border-slate-800/80 pt-3">
+          <p className="mb-2 px-2.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Right Panel
+          </p>
+          <div className="space-y-0.5">
+            {rightPanelItems.map((item) => {
+              const Icon = iconMap[item.id]
+              const isActive = activeItem === item.id
 
-              <div className="space-y-1.5">
-                {card.rows.map((row) => (
-                  <div
-                    className="flex items-center justify-between gap-2 text-[10px] text-slate-400"
-                    key={`${card.id}-${row.label}`}
-                  >
-                    <span className="flex items-center gap-2">
-                      {row.label === 'Live Monitoring' ? (
-                        <span className="signal-dot h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                      ) : (
-                        <Activity className="h-3.5 w-3.5 text-slate-500" />
-                      )}
-                      {row.label}
-                    </span>
-                    <span className={row.tone ?? 'text-slate-200'}>{row.value}</span>
-                  </div>
-                ))}
+              return (
+                <button
+                  className={`group flex w-full items-center justify-between rounded-lg border-l-2 px-2.5 py-1.5 text-left transition ${
+                    isActive
+                      ? 'border-cyan-400 bg-cyan-500/10 text-cyan-100'
+                      : 'border-transparent text-slate-500 hover:bg-white/5 hover:text-slate-200'
+                  }`}
+                  key={item.id}
+                  onClick={() => onSelectItem(item.id)}
+                  type="button"
+                >
+                  <span className="flex items-center gap-2">
+                    <Icon className="h-3.5 w-3.5" />
+                    <span className="text-[10px] font-medium">{item.label}</span>
+                  </span>
+                  <ArrowRight
+                    className={`h-3 w-3 transition ${
+                      isActive
+                        ? 'translate-x-0 text-cyan-200'
+                        : 'text-slate-600 group-hover:translate-x-0.5 group-hover:text-slate-300'
+                    }`}
+                  />
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="mt-auto space-y-2 pt-4">
+          {liveMonitoringRow ? (
+            <section className="panel-muted rounded-[12px] p-2.5">
+              <div className="flex items-center gap-2 text-[10px]">
+                <span className="signal-dot h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                <span className="font-medium uppercase tracking-[0.16em] text-slate-300">
+                  Live Monitoring
+                </span>
               </div>
             </section>
-          ))}
+          ) : null}
         </div>
       </aside>
     </>

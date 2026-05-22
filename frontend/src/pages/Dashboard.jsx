@@ -11,13 +11,19 @@ import FindingsLineChart from '../components/charts/FindingsLineChart'
 import SeverityDonutChart from '../components/charts/SeverityDonutChart'
 import DataSourcesCard from '../components/dashboard/DataSourcesCard'
 import DetectionEngineStatus from '../components/dashboard/DetectionEngineStatus'
+import FindingDetailModal from '../components/dashboard/FindingDetailModal'
 import LatestCriticalAlerts from '../components/dashboard/LatestCriticalAlerts'
 import LiveMonitoringFeed from '../components/dashboard/LiveMonitoringFeed'
 import RecentFindings from '../components/dashboard/RecentFindings'
+import ReportModal from '../components/dashboard/ReportModal'
 import SeverityLegend from '../components/dashboard/SeverityLegend'
 import StatusCard from '../components/cards/StatusCard'
 import DashboardShell from '../components/layout/DashboardShell'
-import { getDashboardOverview } from '../api/client'
+import {
+  getDashboardOverview,
+  getFindingDetail,
+  updateFindingStatus,
+} from '../api/client'
 import { severityTheme } from '../styles/theme'
 
 const ITEMS_PER_PAGE = 3
@@ -50,6 +56,128 @@ function feedMatchesSearch(item, searchTerm) {
   return [item.title, item.company, item.time].join(' ').toLowerCase().includes(searchTerm)
 }
 
+function isResolvedStatus(status) {
+  return status === 'Reviewed' || status === 'False Positive'
+}
+
+function parseFindingDate(value) {
+  return new Date(`${value.replace(' ', 'T')}:00Z`)
+}
+
+function buildTimelineFromFindings(findings, generatedAt) {
+  const baseDate = generatedAt ? new Date(generatedAt) : new Date()
+  const buckets = new Map()
+
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    const current = new Date(baseDate)
+    current.setUTCDate(baseDate.getUTCDate() - offset)
+    const key = current.toISOString().slice(0, 10)
+    buckets.set(key, {
+      date: current.toLocaleDateString('en-GB', {
+        month: 'short',
+        day: 'numeric',
+        timeZone: 'UTC',
+      }),
+      findings: 0,
+    })
+  }
+
+  findings.forEach((finding) => {
+    const key = parseFindingDate(finding.detectedAt).toISOString().slice(0, 10)
+    if (buckets.has(key)) {
+      buckets.get(key).findings += 1
+    }
+  })
+
+  return [...buckets.values()]
+}
+
+function exportDashboardReport({ findings, summary, severityData, generatedAt, context }) {
+  const reportWindow = window.open('', '_blank', 'noopener,noreferrer,width=1080,height=860')
+  if (!reportWindow) return
+
+  const severityRows = severityData
+    .map(
+      (item) =>
+        `<tr><td>${item.label}</td><td style="text-align:right;">${item.value}</td></tr>`
+    )
+    .join('')
+
+  const findingRows = findings
+    .map(
+      (finding) => `
+        <tr>
+          <td>${finding.company}</td>
+          <td>${finding.type}</td>
+          <td>${finding.severity}</td>
+          <td>${finding.riskScore}</td>
+          <td>${finding.status}</td>
+          <td>${finding.detectedAt}</td>
+        </tr>
+      `
+    )
+    .join('')
+
+  reportWindow.document.write(`
+    <html>
+      <head>
+        <title>Leak Detection Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 32px; color: #111827; }
+          h1 { margin-bottom: 8px; }
+          p { color: #4b5563; }
+          .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 24px 0; }
+          .card { border: 1px solid #d1d5db; border-radius: 12px; padding: 14px; }
+          .label { font-size: 12px; text-transform: uppercase; color: #6b7280; margin-bottom: 6px; }
+          .value { font-size: 24px; font-weight: 700; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border-bottom: 1px solid #e5e7eb; padding: 10px 8px; text-align: left; font-size: 13px; }
+          th { color: #374151; }
+          .split { display: grid; grid-template-columns: 280px 1fr; gap: 24px; margin-top: 24px; }
+        </style>
+      </head>
+      <body>
+        <h1>${context.title}</h1>
+        <p>Generated ${generatedAt}</p>
+        <p>${context.subtitle}</p>
+        <div class="grid">
+          <div class="card"><div class="label">Total Findings</div><div class="value">${summary.totalFindings}</div></div>
+          <div class="card"><div class="label">Critical Alerts</div><div class="value">${summary.criticalAlerts}</div></div>
+          <div class="card"><div class="label">Reviewed</div><div class="value">${summary.reviewedFindings}</div></div>
+          <div class="card"><div class="label">Companies</div><div class="value">${summary.monitoredCompanies}</div></div>
+        </div>
+        <div class="split">
+          <div>
+            <h2>Severity Breakdown</h2>
+            <table>
+              <tbody>${severityRows}</tbody>
+            </table>
+          </div>
+          <div>
+            <h2>Findings</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Company</th>
+                  <th>Type</th>
+                  <th>Severity</th>
+                  <th>Score</th>
+                  <th>Status</th>
+                  <th>Detected At</th>
+                </tr>
+              </thead>
+              <tbody>${findingRows}</tbody>
+            </table>
+          </div>
+        </div>
+      </body>
+    </html>
+  `)
+  reportWindow.document.close()
+  reportWindow.focus()
+  reportWindow.print()
+}
+
 function Dashboard() {
   const [activeItem, setActiveItem] = useState('dashboard')
   const [searchValue, setSearchValue] = useState('')
@@ -61,6 +189,12 @@ function Dashboard() {
   const [dashboardData, setDashboardData] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [selectedFindingId, setSelectedFindingId] = useState(null)
+  const [selectedFindingDetail, setSelectedFindingDetail] = useState(null)
+  const [isFindingDetailLoading, setIsFindingDetailLoading] = useState(false)
+  const [findingDetailError, setFindingDetailError] = useState('')
+  const [isUpdatingFindingStatus, setIsUpdatingFindingStatus] = useState(false)
+  const [isReportOpen, setIsReportOpen] = useState(false)
 
   useEffect(() => {
     let isActive = true
@@ -116,11 +250,39 @@ function Dashboard() {
     monitored_companies: 0,
     latest_collection: 'No scan data',
   }
+
+  const syncFindingAcrossDashboard = (updatedFinding) => {
+    setDashboardData((currentData) => {
+      if (!currentData) return currentData
+
+      const nextFindings = (currentData.findings ?? []).map((finding) =>
+        finding.id === updatedFinding.id ? { ...finding, ...updatedFinding } : finding
+      )
+      const reviewedFindings = nextFindings.filter((finding) =>
+        isResolvedStatus(finding.status)
+      ).length
+
+      return {
+        ...currentData,
+        findings: nextFindings,
+        critical_alerts: (currentData.critical_alerts ?? []).map((finding) =>
+          finding.id === updatedFinding.id ? { ...finding, ...updatedFinding } : finding
+        ),
+        summary: {
+          ...currentData.summary,
+          reviewed_findings: reviewedFindings,
+        },
+      }
+    })
+  }
   const normalizedSearchTerm = normalizeSearchTerm(searchValue)
   const hasActiveSearch = normalizedSearchTerm.length > 0
-  const searchMatchedFindings = findings.filter((finding) =>
-    findingMatchesSearch(finding, normalizedSearchTerm)
-  )
+  const hasCompanyFocus = companyFilter !== 'All Companies'
+  const hasActiveFilterContext =
+    hasActiveSearch ||
+    companyFilter !== 'All Companies' ||
+    severityFilter !== 'All Severity' ||
+    statusFilter !== 'All Status'
 
   const companyOptions = [...new Set(findings.map((finding) => finding.company))]
 
@@ -170,19 +332,27 @@ function Dashboard() {
     findingMatchesSearch(alert, normalizedSearchTerm)
   )
   const visibleLiveFeed = liveFeed.filter((item) => feedMatchesSearch(item, normalizedSearchTerm))
-  const visibleSummary = hasActiveSearch
+  const visibleSummary = hasActiveFilterContext
     ? {
-        total_findings: searchMatchedFindings.length,
-        critical_alerts: searchMatchedFindings.filter(
+        total_findings: filteredFindings.length,
+        critical_alerts: filteredFindings.filter(
           (finding) => finding.severity === 'Critical' || finding.severity === 'High'
         ).length,
-        reviewed_findings: searchMatchedFindings.filter(
-          (finding) => finding.status === 'Reviewed'
+        reviewed_findings: filteredFindings.filter((finding) =>
+          isResolvedStatus(finding.status)
         ).length,
-        monitored_companies: new Set(searchMatchedFindings.map((finding) => finding.company)).size,
-        latest_collection: `Search results for "${searchValue.trim()}"`,
+        monitored_companies: new Set(filteredFindings.map((finding) => finding.company)).size,
+        latest_collection: hasCompanyFocus
+          ? `${companyFilter} filtered view`
+          : hasActiveSearch
+          ? `Search results for "${searchValue.trim()}"`
+          : 'Filtered dashboard view',
       }
     : summary
+
+  const visibleTimelineData = hasActiveFilterContext
+    ? buildTimelineFromFindings(filteredFindings, dashboardData?.generated_at)
+    : timelineData
 
   const severityData = (() => {
     const counts = ['Critical', 'High', 'Medium', 'Low', 'Info'].map((label) => {
@@ -191,7 +361,7 @@ function Dashboard() {
 
       return {
         label,
-        value: hasActiveSearch || companyFilter !== 'All Companies' || severityFilter !== 'All Severity' || statusFilter !== 'All Status'
+        value: hasActiveFilterContext
           ? localValue
           : serverValue ?? localValue,
         color: severityTheme[label].chart,
@@ -202,14 +372,14 @@ function Dashboard() {
   })()
 
   const topCompanies =
-    topCompaniesData.length > 0 && !hasActiveSearch
+    topCompaniesData.length > 0 && !hasActiveFilterContext
       ? topCompaniesData.map((company) => ({
           name: company.name,
           count: company.count,
           score: company.score,
           color: severityTheme[company.severity]?.chart ?? severityTheme.Info.chart,
         }))
-      : [...(hasActiveSearch ? searchMatchedFindings : findings)]
+      : [...filteredFindings]
           .sort((left, right) => right.riskScore - left.riskScore)
           .slice(0, 5)
           .map((finding) => ({
@@ -260,6 +430,10 @@ function Dashboard() {
 
   const handleSelectItem = (itemId) => {
     setActiveItem(itemId)
+    if (itemId === 'reports') {
+      setIsReportOpen(true)
+      return
+    }
     const section = document.getElementById(itemId)
     if (section) {
       section.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -270,6 +444,107 @@ function Dashboard() {
     if (page < 1 || page > totalPages) return
     setCurrentPage(page)
   }
+
+  const handleSelectFinding = async (finding) => {
+    setSelectedFindingId(finding.id)
+    setSelectedFindingDetail({
+      ...finding,
+      title: finding.type,
+      summary: 'Loading AI explanation...',
+      recommendedAction: 'Preparing recommended response...',
+      rawUrl: '',
+      publishedAt: '',
+      evidence: [],
+    })
+    setFindingDetailError('')
+    setIsFindingDetailLoading(true)
+
+    try {
+      const detail = await getFindingDetail(finding.id)
+      setSelectedFindingDetail(detail)
+    } catch (error) {
+      setFindingDetailError(error.message || 'Failed to load finding detail.')
+    } finally {
+      setIsFindingDetailLoading(false)
+    }
+  }
+
+  const handleCloseFindingDetail = () => {
+    setSelectedFindingId(null)
+    setSelectedFindingDetail(null)
+    setFindingDetailError('')
+    setIsFindingDetailLoading(false)
+    setIsUpdatingFindingStatus(false)
+  }
+
+  const handleUpdateFindingStatus = async (status) => {
+    if (!selectedFindingId) return
+
+    setIsUpdatingFindingStatus(true)
+    setFindingDetailError('')
+
+    try {
+      const updatedFinding = await updateFindingStatus(selectedFindingId, status)
+      setSelectedFindingDetail(updatedFinding)
+      syncFindingAcrossDashboard(updatedFinding)
+    } catch (error) {
+      setFindingDetailError(error.message || 'Failed to update finding status.')
+    } finally {
+      setIsUpdatingFindingStatus(false)
+    }
+  }
+
+  const generatedLabel = dashboardData?.generated_at
+    ? new Date(dashboardData.generated_at).toLocaleString('en-GB', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : summary.latest_collection || 'No scan data'
+
+  const reportSummary = {
+    totalFindings: visibleSummary.total_findings,
+    criticalAlerts: visibleSummary.critical_alerts,
+    reviewedFindings: visibleSummary.reviewed_findings,
+    monitoredCompanies: visibleSummary.monitored_companies,
+  }
+  const reportSourceBreakdown = Object.values(
+    filteredFindings.reduce((accumulator, finding) => {
+      if (!accumulator[finding.source]) {
+        accumulator[finding.source] = {
+          label: finding.source,
+          count: 0,
+        }
+      }
+      accumulator[finding.source].count += 1
+      return accumulator
+    }, {})
+  ).sort((left, right) => right.count - left.count)
+
+  const focusedCompanyInsights = hasCompanyFocus
+    ? {
+        highestRisk: filteredFindings.reduce(
+          (highest, finding) => Math.max(highest, finding.riskScore),
+          0
+        ),
+        activeSources: new Set(filteredFindings.map((finding) => finding.source)).size,
+        openFindings: filteredFindings.filter(
+          (finding) => !isResolvedStatus(finding.status)
+        ).length,
+      }
+    : null
+  const reportContext = hasCompanyFocus
+    ? {
+        title: `${companyFilter} Exposure Report`,
+        subtitle: `This report is focused on the currently filtered findings for ${companyFilter} and is suitable for a company-specific review or export.`,
+      }
+    : {
+        title: 'Leak Detection Report',
+        subtitle:
+          'This report condenses the active findings queue, severity distribution, and company pressure trend from the current dashboard view into a printable analyst snapshot.',
+      }
 
   const rightPanel = (
     <>
@@ -298,22 +573,14 @@ function Dashboard() {
       <section className="dashboard-fade flex items-center justify-between gap-3" id="dashboard">
         <div>
           <h1 className="section-title font-display text-[1.15rem] font-semibold tracking-tight text-white">
-            Dashboard
+            Home
           </h1>
           <p className="mt-0.5 text-[11px] text-slate-400">
             Real-time overview of detected leaks and exposures
           </p>
         </div>
         <div className="hidden rounded-md border border-slate-800 bg-slate-950/60 px-2 py-1 text-[10px] text-slate-300 xl:block">
-          {dashboardData?.generated_at
-            ? new Date(dashboardData.generated_at).toLocaleString('en-GB', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-              })
-            : summary.latest_collection || 'No scan data'}
+          {generatedLabel}
         </div>
       </section>
 
@@ -352,6 +619,15 @@ function Dashboard() {
       <LatestCriticalAlerts alerts={visibleAlerts} searchValue={searchValue} />
 
       <RecentFindings
+        actions={
+          <button
+            className="rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-[10px] text-cyan-200 transition hover:border-cyan-400/40 hover:text-white"
+            onClick={() => setIsReportOpen(true)}
+            type="button"
+          >
+            Export Report
+          </button>
+        }
         companyFilter={companyFilter}
         companyOptions={companyOptions}
         currentPage={currentPage}
@@ -370,6 +646,7 @@ function Dashboard() {
           setSortBy(value)
           setCurrentPage(1)
         }}
+        onSelectFinding={handleSelectFinding}
         onStatusFilterChange={(value) => {
           setStatusFilter(value)
           setCurrentPage(1)
@@ -409,7 +686,7 @@ function Dashboard() {
           subtitle="Daily detection trend over the last seven days."
           title="Findings Over Time"
         >
-          <FindingsLineChart data={timelineData} />
+          <FindingsLineChart data={visibleTimelineData} />
         </StatusCard>
 
         <StatusCard
@@ -420,6 +697,43 @@ function Dashboard() {
           <CompaniesBarChart companies={topCompanies} />
         </StatusCard>
       </section>
+
+      {isReportOpen ? (
+        <ReportModal
+          findings={sortedFindings}
+          generatedAt={generatedLabel}
+          onClose={() => setIsReportOpen(false)}
+          onExport={() =>
+            exportDashboardReport({
+              findings: sortedFindings,
+              summary: reportSummary,
+              severityData,
+              generatedAt: generatedLabel,
+              context: reportContext,
+            })
+          }
+          companyFocus={hasCompanyFocus}
+          companyName={companyFilter}
+          context={reportContext}
+          focusedCompanyInsights={focusedCompanyInsights}
+          sourceBreakdown={reportSourceBreakdown}
+          timelineData={visibleTimelineData}
+          topCompanies={topCompanies}
+          severityData={severityData}
+          summary={reportSummary}
+        />
+      ) : null}
+
+      {selectedFindingId ? (
+        <FindingDetailModal
+          error={findingDetailError}
+          finding={selectedFindingDetail}
+          isLoading={isFindingDetailLoading}
+          isUpdatingStatus={isUpdatingFindingStatus}
+          onClose={handleCloseFindingDetail}
+          onStatusChange={handleUpdateFindingStatus}
+        />
+      ) : null}
     </DashboardShell>
   )
 }

@@ -3,7 +3,12 @@ import StatusCard from '../cards/StatusCard'
 
 function DataSourcesCard({ items }) {
   return (
-    <StatusCard actionLabel="View All" subtitle="Connected sources" title="Data Sources">
+    <StatusCard
+      id="data-sources-panel"
+      actionLabel="View All"
+      subtitle="Connected sources"
+      title="Data Sources"
+    >
       <div className="space-y-2">
         {items.map((item) => (
           <div

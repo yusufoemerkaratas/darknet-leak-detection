@@ -1,15 +1,15 @@
 import StatusCard from '../cards/StatusCard'
 import FindingsTable from '../tables/FindingsTable'
 
-function RecentFindings(props) {
+function RecentFindings({ actions, ...tableProps }) {
   return (
     <StatusCard
-      actionLabel="View All Findings"
+      actions={actions}
       id="findings"
       subtitle="Latest detected leaks and exposures."
       title="Recent Findings"
     >
-      <FindingsTable {...props} />
+      <FindingsTable {...tableProps} />
     </StatusCard>
   )
 }

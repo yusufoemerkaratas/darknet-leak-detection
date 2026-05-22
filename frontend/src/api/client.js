@@ -23,6 +23,12 @@ export const post = (endpoint, data) =>
     body: JSON.stringify(data),
   });
 
+export const patch = (endpoint, data) =>
+  apiRequest(endpoint, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+
 function mapFinding(finding) {
   return {
     id: finding.id,
@@ -37,6 +43,18 @@ function mapFinding(finding) {
   }
 }
 
+function mapFindingDetail(finding) {
+  return {
+    ...mapFinding(finding),
+    title: finding.title,
+    summary: finding.summary,
+    recommendedAction: finding.recommended_action,
+    rawUrl: finding.raw_url,
+    publishedAt: finding.published_at,
+    evidence: finding.evidence ?? [],
+  }
+}
+
 export async function getDashboardOverview() {
   const data = await get('/dashboard/overview')
 
@@ -45,4 +63,14 @@ export async function getDashboardOverview() {
     findings: (data.findings ?? []).map(mapFinding),
     critical_alerts: (data.critical_alerts ?? []).map(mapFinding),
   }
+}
+
+export async function getFindingDetail(findingId) {
+  const data = await get(`/dashboard/findings/${findingId}`)
+  return mapFindingDetail(data)
+}
+
+export async function updateFindingStatus(findingId, status) {
+  const data = await patch(`/dashboard/findings/${findingId}/status`, { status })
+  return mapFindingDetail(data)
 }

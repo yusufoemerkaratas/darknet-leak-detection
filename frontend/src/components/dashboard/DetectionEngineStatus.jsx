@@ -3,7 +3,11 @@ import StatusCard from '../cards/StatusCard'
 
 function DetectionEngineStatus({ modelStatus, successRate }) {
   return (
-    <StatusCard subtitle="Pipeline status" title="Detection Engine Status">
+    <StatusCard
+      id="engine-status-panel"
+      subtitle="Pipeline status"
+      title="Detection Engine Status"
+    >
       <div className="space-y-2">
         <div className="flex items-center justify-between rounded-[12px] border border-slate-800/80 bg-slate-950/45 px-3 py-2 text-[12px]">
           <span className="flex items-center gap-2 text-slate-300">

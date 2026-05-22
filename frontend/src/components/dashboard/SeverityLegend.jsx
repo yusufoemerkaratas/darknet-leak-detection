@@ -3,7 +3,7 @@ import { severityTheme } from '../../styles/theme'
 
 function SeverityLegend({ items }) {
   return (
-    <StatusCard subtitle="Score thresholds" title="Severity Legend">
+    <StatusCard id="severity-legend" subtitle="Score thresholds" title="Severity Legend">
       <div className="space-y-2">
         {items.map((item) => (
           <div className="flex items-center justify-between gap-3 text-[12px]" key={item.label}>

@@ -3,7 +3,7 @@ import StatusCard from '../cards/StatusCard'
 function LiveMonitoringFeed({ items, searchValue }) {
   return (
     <StatusCard
-      id="sources"
+      id="monitoring-feed"
       live
       subtitle="Streaming detections"
       title="Live Monitoring Feed"

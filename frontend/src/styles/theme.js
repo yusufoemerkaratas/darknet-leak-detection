@@ -35,6 +35,7 @@ export const statusTheme = {
   New: 'border border-rose-500/20 bg-rose-500/10 text-rose-200',
   Reviewing: 'border border-amber-500/20 bg-amber-500/10 text-amber-200',
   Reviewed: 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-200',
+  'False Positive': 'border border-sky-500/20 bg-sky-500/10 text-sky-200',
   Escalated: 'border border-fuchsia-500/20 bg-fuchsia-500/10 text-fuchsia-200',
 }
 

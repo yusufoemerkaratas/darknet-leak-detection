@@ -17,6 +17,7 @@ function FindingsTable({
   totalResults,
   totalPages,
   onPageChange,
+  onSelectFinding,
 }) {
   const filterClassName =
     'rounded-lg border border-slate-800 bg-[#050913] px-2.5 py-1.5 text-[11px] text-slate-300 outline-none appearance-none'
@@ -59,6 +60,7 @@ function FindingsTable({
             <option value="New">New</option>
             <option value="Reviewing">Reviewing</option>
             <option value="Reviewed">Reviewed</option>
+            <option value="False Positive">False Positive</option>
             <option value="Escalated">Escalated</option>
           </select>
         </div>
@@ -101,7 +103,11 @@ function FindingsTable({
               const statusTone = getStatusTheme(finding.status)
 
               return (
-                <tr className="data-row" key={finding.id}>
+                <tr
+                  className={`data-row ${onSelectFinding ? 'cursor-pointer' : ''}`}
+                  key={finding.id}
+                  onClick={onSelectFinding ? () => onSelectFinding(finding) : undefined}
+                >
                   <td className="px-3 py-2.5">
                     <div className="font-medium text-[11px] text-slate-100">{finding.company}</div>
                   </td>
