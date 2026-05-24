@@ -1,4 +1,6 @@
 from models import Source, Company, LeakRecord
+from alert_generator import generate_alert
+
 dedup_cache = set()
 
 def create_source(db, source):
@@ -115,6 +117,15 @@ def bulk_insert_leak_records(db, leak_records):
 
         for record in new_records:
             dedup_cache.add(record["content_hash"])
+
+        inserted_hashes = [r["content_hash"] for r in new_records]
+        inserted_records = (
+            db.query(LeakRecord)
+            .filter(LeakRecord.content_hash.in_(inserted_hashes))
+            .all()
+        )
+        for record in inserted_records:
+            generate_alert(db, record)
 
     for content_hash in existing_hashes:
         dedup_cache.add(content_hash)
