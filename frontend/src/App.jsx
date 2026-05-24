@@ -1,12 +1,8 @@
-import Header from './components/Header'
+import './App.css'
+import Dashboard from './pages/Dashboard'
 
 function App() {
-  return (
-    <div>
-      <Header />
-      <p>Frontend is working</p>
-    </div>
-  )
+  return <Dashboard />
 }
 
 export default App

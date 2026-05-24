@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -10,8 +12,8 @@ router = APIRouter(prefix="/crawl-jobs", tags=["Crawl Jobs"])
 
 @router.get("/", response_model=list[CrawlJobOut])
 def get_crawl_jobs(
-    status: str | None = None,
-    source_id: int | None = None,
+    status: Optional[str] = None,
+    source_id: Optional[int] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
