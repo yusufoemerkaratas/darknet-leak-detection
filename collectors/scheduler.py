@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from darknet_forum_collector_authenticated import AuthenticatedForumCollector, load_config
 from js_collector import SPALeakCollector
 from ransomwatch_collector import RansomwatchCollector
+from paste_collector import PasteCollector
 from ingestion_pipeline import run_pipeline
 
 import os
@@ -114,6 +115,13 @@ def job():
             rw.close()
         except Exception as e:
             logger.error(f"[ransomwatch] Collector error: {e}")
+
+        # 3. Paste sites (pastebin, paste.ee)
+        try:
+            pc = PasteCollector()
+            _run_with_job(db, "paste_sites", "https://pastebin.com", pc.run)
+        except Exception as e:
+            logger.error(f"[paste] Collector error: {e}")
 
         logger.info("Scraping completed. Starting ingestion pipeline...")
 
