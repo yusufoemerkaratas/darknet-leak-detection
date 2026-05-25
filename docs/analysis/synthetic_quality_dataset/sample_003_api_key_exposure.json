@@ -1,0 +1,7 @@
+{
+  "synthetic": true,
+  "title": "Synthetic GitHub token exposure sample",
+  "body": "Google source code mirror contains API_KEY=demo-value and ghp_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa in a private repository backup.",
+  "language": "en",
+  "expected_classification": "high-risk"
+}
