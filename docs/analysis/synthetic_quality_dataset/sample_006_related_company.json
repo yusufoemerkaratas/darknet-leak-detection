@@ -1,0 +1,7 @@
+{
+  "synthetic": true,
+  "title": "Synthetic related company mention sample",
+  "body": "Microsoft outage discussion mentions access concerns but no leaked data, no credentials, and no dump attached.",
+  "language": "en",
+  "expected_classification": "related"
+}
