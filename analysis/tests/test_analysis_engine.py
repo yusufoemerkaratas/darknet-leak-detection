@@ -1,5 +1,6 @@
 from analysis.analysis_engine import AnalysisEngine
 from analysis.classifier import FindingClassifier
+from analysis.scorer import RiskScorer
 
 
 def test_high_risk_analysis_engine():
@@ -65,3 +66,18 @@ def test_classifier_requires_credentials_for_high_risk():
     }
     result = classifier.classify(90, flags_with_credential)
     assert result.classification == "high-risk"
+
+
+def test_scorer_applies_compromised_company_and_unclear_context_adjustments():
+    scorer = RiskScorer()
+
+    result = scorer.score(
+        patterns=[{"pattern_type": "config_api_key", "confidence": 0.8, "context_unclear": True}],
+        terminology=[],
+        companies=[{"company_name": "Microsoft", "match_type": "exact", "known_compromised": True}],
+    )
+
+    assert result.score_breakdown["known_compromised_company"] == 10
+    assert result.score_breakdown["context_unclear_adjustment"] == -5
+    assert result.signal_flags["has_known_compromised_company"] is True
+    assert result.signal_flags["has_unclear_context"] is True

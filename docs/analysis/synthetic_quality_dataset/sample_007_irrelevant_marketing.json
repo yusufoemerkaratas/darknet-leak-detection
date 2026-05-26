@@ -1,0 +1,8 @@
+{
+  "synthetic": true,
+  "title": "Synthetic irrelevant marketing sample",
+  "body": "Exclusive summer sale for new customers. Click here for a discount code and fast onboarding.",
+  "language": "en",
+  "is_spam": true,
+  "expected_classification": "irrelevant"
+}
