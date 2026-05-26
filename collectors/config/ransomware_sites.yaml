@@ -9274,7 +9274,7 @@ groups:
         available: false
       - url: "http://ftp://dataShare:2bTWYKNn7aK7Rqp9mnv3@185.39.17.75"
         available: false
-      - url: "http://ftp://datashare:C}^SLA"5Vl?vX#R4tg^}:hd3@185.196.10.52"
+      - url: 'http://ftp://datashare:C}^SLA"5Vl?vX#R4tg^}:hd3@185.196.10.52'
         available: false
       - url: "http://ftp://dataShare:2bTWYKNn7aK7Rqp9mnv3@185.196.10.19"
         available: false

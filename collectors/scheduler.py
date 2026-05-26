@@ -8,6 +8,7 @@ from darknet_forum_collector_authenticated import AuthenticatedForumCollector, l
 from js_collector import SPALeakCollector
 from ransomwatch_collector import RansomwatchCollector
 from paste_collector import PasteCollector
+from ransomware_collector import RansomwareCollector
 from ingestion_pipeline import run_pipeline
 
 import os
@@ -122,6 +123,19 @@ def job():
             _run_with_job(db, "paste_sites", "https://pastebin.com", pc.run)
         except Exception as e:
             logger.error(f"[paste] Collector error: {e}")
+
+        # 4. Ransomware sites (tor + clearnet)
+        try:
+            rc = RansomwareCollector()
+            _run_with_job(
+                db,
+                "ransomware_sites",
+                "ransomware_sites.yaml",
+                rc.run,
+            )
+            rc.close()
+        except Exception as e:
+            logger.error(f"[ransomware_sites] Collector error: {e}")
 
         logger.info("Scraping completed. Starting ingestion pipeline...")
 
