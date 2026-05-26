@@ -1,46 +1,331 @@
 metadata:
-  version: "1.0"
-  last_updated: "2026-04-18"
+  version: "1.1"
+  last_updated: "2026-05-25"
 
 companies:
+
+  # ── Big Tech (original) ──────────────────────────────────────
   - name: Microsoft
-    aliases:
-      - MSFT
-      - MS
-      - Microsoft Corp
-      - Micro$oft
-    domains:
-      - microsoft.com
+    aliases: [MSFT, MS, Microsoft Corp, Micro$oft]
+    domains: [microsoft.com]
 
   - name: Amazon
-    aliases:
-      - AMZN
-      - AWS
-      - Amazon.com
-    domains:
-      - amazon.com
+    aliases: [AMZN, AWS, Amazon.com]
+    domains: [amazon.com]
 
   - name: Google
-    aliases:
-      - GOOGL
-      - Alphabet
-      - GCP
-    domains:
-      - google.com
+    aliases: [GOOGL, Alphabet, GCP]
+    domains: [google.com]
 
   - name: Meta
-    aliases:
-      - FB
-      - Facebook
-      - Instagram
-    domains:
-      - meta.com
-      - facebook.com
-      - instagram.com
+    aliases: [FB, Facebook, Instagram]
+    domains: [meta.com, facebook.com, instagram.com]
 
   - name: Apple
-    aliases:
-      - AAPL
-      - Apple Inc
-    domains:
-      - apple.com
+    aliases: [AAPL, Apple Inc]
+    domains: [apple.com]
+
+  # ── RansomHouse victims (auto-imported from DB 2026-05-25) ──
+  - name: ABS-CBN Broadcasting
+    aliases: [ACB]
+  - name: ADATA Technology
+    aliases: [AT]
+  - name: AESCULAPIUS Farmaceutici
+    aliases: [AF]
+  - name: AHS Aviation Handling Services GmbH
+    aliases: [AAHSG, AHS Aviation Handling]
+  - name: ALPS Ltd
+    aliases: [AL, ALPS]
+  - name: ASKUL
+  - name: AV Industries
+    aliases: [AI]
+  - name: Accelerated Services
+    aliases: [AS, Accelerated]
+  - name: Advance Press
+    aliases: [AP]
+  - name: Advanced Micro Devices, Inc
+    aliases: [AMDI, Advanced Micro Devices]
+  - name: Aero Engine Solution INC
+    aliases: [AESI, Aero Engine]
+  - name: Al-Karam Textile Mills Pvt
+    aliases: [AKTMP, Al-Karam Textile Mills]
+  - name: "Albany ENT & Allergy Services"
+    aliases: [AEAS, "Albany ENT & Allergy"]
+  - name: Arkan
+  - name: Armis Group
+    aliases: [AG, Armis]
+  - name: Army Welfare Trust
+    aliases: [AWT]
+  - name: Associated Endocrinologists
+    aliases: [AE]
+  - name: Assolim
+  - name: Astrofein
+  - name: Audio Video
+    aliases: [AV]
+  - name: AvidXchange
+  - name: BRYCON Construction
+    aliases: [BC]
+  - name: Bacton Transport Services
+    aliases: [BTS, Bacton Transport]
+  - name: Banco Promerica de la República Dominicana
+    aliases: [BPRD]
+  - name: Bank Pembangunan Daerah Banten Tbk PT
+    aliases: [BPDBTP, Bank Pembangunan Daerah Banten]
+  - name: Berge Bulk
+    aliases: [BB]
+  - name: Bioptik Technology
+    aliases: [BT]
+  - name: C-Mec
+  - name: Carmen Copper Corporation
+    aliases: [CCC, Carmen Copper]
+  - name: Cell C
+  - name: Commune de Jemeppe-sur-Sambre
+    aliases: [CJS]
+  - name: Comune Taggia
+    aliases: [CT]
+  - name: Cospec Srl
+    aliases: [CS, Cospec]
+  - name: Creative Realities
+    aliases: [CR]
+  - name: Cressex Community School
+    aliases: [CCS]
+  - name: Customer Elation - Business Information
+    aliases: [CEBI]
+  - name: DLCOSMETICS O.E.
+    aliases: [DLCOSMETICS O.E]
+  - name: Dameron Hospital
+    aliases: [DH]
+  - name: Delaware Life Insurance Company
+    aliases: [DLIC]
+  - name: Dellner Couplers AB
+    aliases: [DCA, Dellner Couplers]
+  - name: Design CATAPULT
+    aliases: [DC]
+  - name: Diaz Gill Medicina Laboratorial S.A.
+    aliases: [DGML, Diaz Gill Medicina Laboratorial S.A]
+  - name: "E&S Heating & Ventilation Ltd"
+    aliases: ["E&S Heating & Ventilation", HVL]
+  - name: ESSPL
+  - name: EUC Sjlland
+    aliases: [ES]
+  - name: "Fairfax - Crum & Forster"
+    aliases: [FCF]
+  - name: Faraday Technology
+    aliases: [FT]
+  - name: Fedcap
+  - name: First Financial Security
+    aliases: [FFS]
+  - name: First Resources
+    aliases: [FR]
+  - name: Francesco Parisi
+    aliases: [FP]
+  - name: Fucerep
+  - name: Fulgar S.p.A.
+    aliases: [Fulgar]
+  - name: Fursan Travel
+    aliases: [FT]
+  - name: GCA Nederland
+    aliases: [GN]
+  - name: GWP Engineering
+    aliases: [GE, GWP]
+  - name: Gantan Beauty Industry
+    aliases: [GBI]
+  - name: Gestores Administrativos Reunidos
+    aliases: [GAR]
+  - name: Greater Pittsburgh Orthopaedic Associates
+    aliases: [GPOA, Greater Pittsburgh Orthopaedic]
+  - name: GuangDong South Land pharmaceutical
+    aliases: [GSL]
+  - name: Guaranteed Supply Company
+    aliases: [GSC]
+  - name: HAL Allergy
+    aliases: [HA]
+  - name: HOE Pharmaceuticals Sdn Bhd
+    aliases: [HOE Pharmaceuticals, HPSB]
+  - name: Hawbaker Engineering
+    aliases: [HE, Hawbaker]
+  - name: Hawkins Delafield Wood
+    aliases: [HDW]
+  - name: Hbl Cpas, P.C.
+    aliases: [HC, Hbl Cpas, P.C]
+  - name: Hedbergs
+  - name: Hellmich
+  - name: Hirsh Industries
+    aliases: [HI, Hirsh]
+  - name: Holovis
+  - name: Hong Kong College of Technology
+    aliases: [HKCT]
+  - name: Hospital Clinic de Barcelona
+    aliases: [HCB]
+  - name: Hospital Service SpA
+    aliases: [HSS, Hospital]
+  - name: IMI Hydronic Engineering
+    aliases: [IHE, IMI Hydronic]
+  - name: INFiLED
+  - name: Imedexsa
+  - name: Indonesia Power
+    aliases: [IP]
+  - name: Industrial Steam
+    aliases: [IS]
+  - name: Infomedika
+  - name: Interior Metals
+    aliases: [IM]
+  - name: Ipca Laboratories
+    aliases: [IL]
+  - name: Irec Sas
+    aliases: [IS]
+  - name: Isaacs Odinocki
+    aliases: [IO]
+  - name: "J & N Stone"
+  - name: Jefferson Credit Union
+    aliases: [JCU]
+  - name: Jeffries Morris
+    aliases: [JM]
+  - name: Jiangsu Zenergy Battery Technologies Group Co., Ltd.
+    aliases: [Jiangsu Zenergy Battery]
+  - name: Keralty
+  - name: KuiperCompagnons
+  - name: Kurogane Kasei Co.
+    aliases: [KKC, Kurogane Kasei Co]
+  - name: Lago Group Spa
+    aliases: [LGS, Lago]
+  - name: Lake Washington Institute of Technology
+    aliases: [LWIT]
+  - name: Lawsoft
+  - name: Lopesan Hotels
+    aliases: [LH]
+  - name: Low Keng Huat
+    aliases: [LKH]
+  - name: Luxshare Precision Industry Co. Ltd.
+    aliases: [LPICL, Luxshare Precision Industry]
+  - name: M8 Group
+  - name: MARCK Industries
+    aliases: [MARCK, MI]
+  - name: Makro
+  - name: Maxell Asia
+    aliases: [MA]
+  - name: Mission Community Hospital
+    aliases: [MCH]
+  - name: NEW JERSEY CPA
+    aliases: [NJC]
+  - name: Nationz Technologies Inc.
+    aliases: [NTI, Nationz]
+  - name: Neinver
+  - name: OCI International Holdings
+    aliases: [OCI, OIH]
+  - name: OMT Officine Meccaniche Torino S.p.A.
+    aliases: [OMT Officine Meccaniche Torino, OOMT]
+  - name: Octomeca Oy
+    aliases: [OO, Octomeca]
+  - name: OeTTINGER Brauerei
+    aliases: [OB]
+  - name: Polidano Group
+    aliases: [PG, Polidano]
+  - name: Prada Gayoso
+    aliases: [PG]
+  - name: Radley and Co
+    aliases: [RC]
+  - name: Rapid Granulator
+    aliases: [RG]
+  - name: Republic of Vanuatu
+    aliases: [RV]
+  - name: RiverSoft
+  - name: "Ronglian Group [Source code of RONGLIAN GROUP company developments]"
+    aliases: [RGSRG, Ronglian]
+  - name: "Royal Star & Garter"
+    aliases: [RSG]
+  - name: S Food Co., Ltd.
+    aliases: [FCL, S Food]
+  - name: SAC Finance
+    aliases: [SF]
+  - name: SHOPRITE HOLDINGS LTD
+    aliases: [SHL, SHOPRITE]
+  - name: SMB Solutions
+    aliases: [SMB, SS]
+  - name: STERCH - INTERNATIONAL s.r.o.
+    aliases: [SI, STERCH -]
+  - name: Sabesp
+  - name: Saskatchewan Liquor and Gaming Authority
+    aliases: [SLGA]
+  - name: Severn Glocon Group
+    aliases: [SGG, Severn Glocon]
+  - name: Shipleys LLP
+    aliases: [SL]
+  - name: Sibanye-Stillwater
+    aliases: [SS]
+  - name: Soderstrom Architects, LTD
+    aliases: [SAL, Soderstrom]
+  - name: Soleol
+  - name: "St. Kitts & Nevis"
+    aliases: [SKN]
+  - name: Star Energy Geothermal Salak
+    aliases: [SEGS]
+  - name: Strem Chemicals
+    aliases: [SC]
+  - name: Summit Care
+    aliases: [SC]
+  - name: Supreme Administrative Court of Bulgaria
+    aliases: [SACB]
+  - name: Swedish Arts Council
+    aliases: [SAC]
+  - name: TUV India Pvt. Ltd.
+    aliases: [TIPL, TUV India]
+  - name: Tanbridge House School
+    aliases: [THS]
+  - name: Telecontrol
+  - name: The DGCX
+    aliases: [TD]
+  - name: The Loretto Hospital
+    aliases: [TLH]
+  - name: The Plainview Volunteer FD
+    aliases: [TPVF]
+  - name: Trans Maldivian Airways
+    aliases: [TMA]
+  - name: Transaction Packing Inc
+    aliases: [TPI, Transaction Packing]
+  - name: Tranztec Solutions
+    aliases: [TS, Tranztec]
+  - name: Tri State Electric
+    aliases: [TSE]
+  - name: Triple Jump
+    aliases: [TJ]
+  - name: United Lube Oil
+    aliases: [ULO]
+  - name: United Urology Group
+    aliases: [UUG, United Urology]
+  - name: Universite Paris Sud
+    aliases: [UPS]
+  - name: VOP CZ
+    aliases: [VC]
+  - name: Valisana
+  - name: Van Oirschot
+    aliases: [VO]
+  - name: Vennerhus Weine AG
+    aliases: [VWA, Vennerhus Weine]
+  - name: Veren Inc and Crescent Point Energy
+    aliases: [VICPE, Veren]
+  - name: Victorian Chemical
+    aliases: [VC]
+  - name: Vinda Group
+    aliases: [VG, Vinda]
+  - name: Virum Apotek
+    aliases: [VA]
+  - name: WEBER
+  - name: Wangkanai Group
+    aliases: [WG, Wangkanai]
+  - name: Warren County Sheriff’s Office
+    aliases: [WCSO]
+  - name: Warren General Hospital
+    aliases: [WGH]
+  - name: Webber International University
+    aliases: [WIU, Webber]
+  - name: Weber Flavors
+    aliases: [WF]
+  - name: Winnitex (Americas) Limited
+    aliases: [WAL, Winnitex (Americas)]
+  - name: Wison Engineering
+    aliases: [WE, Wison]
+  - name: "[i2p-torrent] Roberto Verino Difusion"
+    aliases: [RVD]
+  - name: "[i2p-torrent]Jangho Group"
+    aliases: [JG, "[i2p-torrent]Jangho"]
