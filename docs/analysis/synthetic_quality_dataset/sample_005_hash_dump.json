@@ -1,0 +1,7 @@
+{
+  "synthetic": true,
+  "title": "Synthetic hashed credential dump sample",
+  "body": "Apple employee credential dump: admin:5f4dcc3b5aa765d61d8327deb882cf99 and leaked private user data.",
+  "language": "en",
+  "expected_classification": "high-risk"
+}

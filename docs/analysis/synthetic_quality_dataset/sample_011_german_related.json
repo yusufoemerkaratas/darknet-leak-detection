@@ -1,0 +1,7 @@
+{
+  "synthetic": true,
+  "title": "Synthetic German related sample",
+  "body": "Google wurde in einem Forum erwaehnt, aber es gibt keine Zugangsdaten und keinen Datenbankauszug.",
+  "language": "de",
+  "expected_classification": "related"
+}

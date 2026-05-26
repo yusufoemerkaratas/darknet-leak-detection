@@ -55,9 +55,11 @@ class RiskScorer:
             "terminology_medium": 0,
             "terminology_low_conditional": 0,
             "industry_indicator": 0,
+            "known_compromised_company": 0,
             "multiple_signals_bonus": 0,
             "fuzzy_match_adjustment": 0,
             "low_confidence_adjustment": 0,
+            "context_unclear_adjustment": 0,
             "subtotal_before_cap": 0,
             "final_score": 0,
         }
@@ -79,9 +81,21 @@ class RiskScorer:
             company.get("match_type") == "fuzzy"
             for company in companies
         )
+        has_known_compromised_company = any(
+            bool(
+                company.get("known_compromised")
+                or company.get("is_compromised")
+                or company.get("compromised")
+            )
+            for company in companies
+        )
 
         has_credential = bool(pattern_types.intersection(CREDENTIAL_PATTERN_TYPES))
         has_database_dump = bool(pattern_types.intersection(DATABASE_PATTERN_TYPES))
+        has_unclear_context = any(
+            bool(item.get("context_unclear"))
+            for item in patterns + terminology
+        )
 
         high_terms = {
             term.get("term")
@@ -141,6 +155,10 @@ class RiskScorer:
             breakdown["industry_indicator"] = 5
             signal_groups.add("industry")
 
+        if has_known_compromised_company:
+            breakdown["known_compromised_company"] = 10
+            signal_groups.add("known_compromised_company")
+
         if len(signal_groups) >= 3:
             breakdown["multiple_signals_bonus"] = 5
 
@@ -154,6 +172,9 @@ class RiskScorer:
 
         if low_confidence_patterns and not has_credential and not has_database_dump:
             breakdown["low_confidence_adjustment"] = -5
+
+        if has_unclear_context:
+            breakdown["context_unclear_adjustment"] = -5
 
         subtotal = sum(
             value for value in breakdown.values()
@@ -169,8 +190,10 @@ class RiskScorer:
             "has_company": has_company,
             "has_domain": has_domain,
             "has_fuzzy_company": has_fuzzy_company,
+            "has_known_compromised_company": has_known_compromised_company,
             "has_credential": has_credential,
             "has_database_dump": has_database_dump,
+            "has_unclear_context": has_unclear_context,
             "has_high_terminology": bool(high_terms),
             "has_medium_terminology": bool(medium_terms),
             "signal_group_count": len(signal_groups),

@@ -32,6 +32,9 @@ Each signal listed below is evaluated independently. Multiple signals of the sam
 | Database dump detected | +35 |
 | Leak terminology, high priority term | +15 |
 | Leak terminology, medium priority term | +10 |
+| Leak terminology, low priority term with another stronger signal | +5 |
+| Industry indicator term | +5 |
+| Known compromised company flag | +10 |
 | Multiple signals bonus, three or more distinct signals | +5 |
 
 The multiple signals bonus is applied once regardless of how many signals exceed the threshold of three.
@@ -46,6 +49,7 @@ Adjustments are applied after all signal points are summed. They represent reduc
 |---|---|
 | Low confidence, unverified claim, single source, no attachment | -5 |
 | Fuzzy match used in place of exact or alias match | -3 |
+| Context unclear or ambiguous | -5 |
 
 ---
 
@@ -155,9 +159,13 @@ score += 30   # if credential pattern detected
 score += 35   # if database dump detected
 score += 15   # per high-priority terminology match
 score += 10   # per medium-priority terminology match
+score += 5    # if low-priority terminology appears with stronger evidence
+score += 5    # if industry-specific terminology is present
+score += 10   # if the matched company is marked as known compromised
 score += 5    # if three or more distinct signals present, applied once
 score -= 5    # if low confidence
 score -= 3    # if fuzzy match was used
+score -= 5    # if the surrounding context is unclear or ambiguous
 score  = min(score, 100)
 score  = max(score, 0)
 ```

@@ -29,6 +29,8 @@ app.include_router(company.router)
 app.include_router(crawl_job.router)
 app.include_router(dashboard.router)
 app.include_router(finding.router)
+app.include_router(finding.alert_router)
+app.include_router(finding.stats_router)
 
 # ---------------------------------------------------------------------------
 # DB dependency

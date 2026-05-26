@@ -1,0 +1,7 @@
+{
+  "synthetic": true,
+  "title": "Synthetic Amazon database dump sample",
+  "body": "Amazon AWS internal user data and client list leaked. INSERT INTO accounts VALUES (1, 'admin@amazon.com', 'hash');",
+  "language": "en",
+  "expected_classification": "suspicious"
+}

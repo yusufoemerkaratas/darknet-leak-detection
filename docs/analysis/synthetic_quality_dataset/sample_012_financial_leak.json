@@ -1,0 +1,7 @@
+{
+  "synthetic": true,
+  "title": "Synthetic financial leak sample",
+  "body": "Amazon financial transaction records leaked with user data and client list. Contact seller for access.",
+  "language": "en",
+  "expected_classification": "suspicious"
+}

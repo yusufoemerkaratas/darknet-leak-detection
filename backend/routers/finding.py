@@ -4,9 +4,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from db import SessionLocal
-from models import Alert, Company, LeakRecord
+from models import Alert, AnalysisResult, Company, LeakRecord
 
 router = APIRouter(prefix="/findings", tags=["findings"])
+alert_router = APIRouter(tags=["alerts"])
+stats_router = APIRouter(tags=["stats"])
 
 
 def get_db():
@@ -15,6 +17,88 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def _serialize_alert(alert: Alert, db: Session) -> dict:
+    finding = (
+        db.query(LeakRecord)
+        .filter(LeakRecord.id == alert.leak_record_id)
+        .first()
+    )
+
+    company = (
+        db.query(Company)
+        .filter(Company.id == alert.company_id)
+        .first()
+    )
+
+    return {
+        "id": alert.id,
+        "finding_title": finding.title if finding else None,
+        "severity": alert.severity,
+        "company": company.name if company else None,
+        "created_at": alert.created_at,
+    }
+
+
+def _serialize_analysis_result(result: AnalysisResult | None) -> dict | None:
+    if result is None:
+        return None
+
+    return {
+        "id": result.id,
+        "leak_record_id": result.leak_record_id,
+        "detected_patterns": result.detected_patterns,
+        "matched_companies": result.matched_companies,
+        "terminology_hits": result.terminology_hits,
+        "score_contributors": result.score_contributors,
+        "classification_rule": result.classification_rule,
+        "created_at": result.created_at,
+    }
+
+
+def _query_alerts(
+    db: Session,
+    severity: str | None,
+    company_id: int | None,
+    is_reviewed: bool | None,
+    date_from: datetime | None,
+    date_to: datetime | None,
+    page: int,
+    size: int,
+) -> dict:
+    query = db.query(Alert)
+
+    if severity:
+        query = query.filter(Alert.severity == severity)
+
+    if company_id:
+        query = query.filter(Alert.company_id == company_id)
+
+    if is_reviewed is not None:
+        query = query.filter(Alert.is_reviewed == is_reviewed)
+
+    if date_from is not None:
+        query = query.filter(Alert.created_at >= date_from)
+
+    if date_to is not None:
+        query = query.filter(Alert.created_at <= date_to)
+
+    total = query.count()
+
+    alerts = (
+        query.order_by(Alert.created_at.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+        .all()
+    )
+
+    return {
+        "page": page,
+        "size": size,
+        "total": total,
+        "items": [_serialize_alert(alert, db) for alert in alerts],
+    }
 
 
 @router.get("")
@@ -108,63 +192,40 @@ def list_alerts(
     size: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-
-    query = db.query(Alert)
-
-    if severity:
-        query = query.filter(Alert.severity == severity)
-
-    if company_id:
-        query = query.filter(Alert.company_id == company_id)
-
-    if is_reviewed is not None:
-        query = query.filter(Alert.is_reviewed == is_reviewed)
-
-    if date_from is not None:
-        query = query.filter(Alert.created_at >= date_from)
-
-    if date_to is not None:
-        query = query.filter(Alert.created_at <= date_to)
-
-    total = query.count()
-
-    alerts = (
-        query.order_by(Alert.created_at.desc())
-        .offset((page - 1) * size)
-        .limit(size)
-        .all()
+    return _query_alerts(
+        db=db,
+        severity=severity,
+        company_id=company_id,
+        is_reviewed=is_reviewed,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        size=size,
     )
 
-    result = []
 
-    for alert in alerts:
+@alert_router.get("/alerts")
+def list_alerts_root(
+    severity: str | None = None,
+    company_id: int | None = None,
+    is_reviewed: bool | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=10, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    return _query_alerts(
+        db=db,
+        severity=severity,
+        company_id=company_id,
+        is_reviewed=is_reviewed,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        size=size,
+    )
 
-        finding = (
-            db.query(LeakRecord)
-            .filter(LeakRecord.id == alert.leak_record_id)
-            .first()
-        )
-
-        company = (
-            db.query(Company)
-            .filter(Company.id == alert.company_id)
-            .first()
-        )
-
-        result.append({
-            "id": alert.id,
-            "finding_title": finding.title if finding else None,
-            "severity": alert.severity,
-            "company": company.name if company else None,
-            "created_at": alert.created_at,
-        })
-
-    return {
-        "page": page,
-        "size": size,
-        "total": total,
-        "items": result,
-    }
 
 @router.get("/{finding_id}")
 def get_finding_detail(
@@ -194,7 +255,7 @@ def get_finding_detail(
     "risk_score": finding.risk_score,
     "severity": finding.severity,
     "created_at": finding.collected_at,
-    "analysis_result": finding.analysis_result,
+    "analysis_result": _serialize_analysis_result(finding.analysis_result),
     "is_reviewed": finding.is_reviewed,
     "is_false_positive": finding.is_false_positive,
     "review_notes": finding.review_notes
@@ -266,6 +327,17 @@ def mark_false_positive(
 def findings_by_severity(
     db: Session = Depends(get_db),
 ):
+    return _findings_by_severity(db)
+
+
+@stats_router.get("/stats/findings-by-severity")
+def findings_by_severity_root(
+    db: Session = Depends(get_db),
+):
+    return _findings_by_severity(db)
+
+
+def _findings_by_severity(db: Session) -> dict:
     critical = (
         db.query(LeakRecord)
         .filter(LeakRecord.risk_score >= 90)
