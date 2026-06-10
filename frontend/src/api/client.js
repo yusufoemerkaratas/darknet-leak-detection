@@ -55,8 +55,9 @@ function mapFindingDetail(finding) {
   }
 }
 
-export async function getDashboardOverview() {
-  const data = await get('/dashboard/overview')
+export async function getDashboardOverview(timelineRange = '7d') {
+  const query = new URLSearchParams({ timeline_range: timelineRange }).toString()
+  const data = await get(`/dashboard/overview?${query}`)
 
   return {
     ...data,

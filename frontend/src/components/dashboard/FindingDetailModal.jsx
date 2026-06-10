@@ -1,7 +1,7 @@
 import { ExternalLink, X } from 'lucide-react'
 import { getSeverityTheme, getStatusTheme } from '../../styles/theme'
 
-const statusOptions = ['Reviewing', 'Reviewed', 'False Positive']
+const statusOptions = ['Not Reviewed', 'Reviewed', 'False Positive', 'Escalated']
 
 function FindingDetailModal({
   finding,

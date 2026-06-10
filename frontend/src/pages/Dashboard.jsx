@@ -17,6 +17,7 @@ import LiveMonitoringFeed from '../components/dashboard/LiveMonitoringFeed'
 import RecentFindings from '../components/dashboard/RecentFindings'
 import ReportModal from '../components/dashboard/ReportModal'
 import SeverityLegend from '../components/dashboard/SeverityLegend'
+import TimelineRangeSelector from '../components/dashboard/TimelineRangeSelector'
 import StatusCard from '../components/cards/StatusCard'
 import DashboardShell from '../components/layout/DashboardShell'
 import {
@@ -28,6 +29,11 @@ import { severityTheme } from '../styles/theme'
 
 const ITEMS_PER_PAGE = 3
 const REFRESH_INTERVAL_MS = 30000
+const TIMELINE_RANGE_LABELS = {
+  '7d': 'last 7 days',
+  '30d': 'last 30 days',
+  '365d': 'last 12 months',
+}
 
 function normalizeSearchTerm(value) {
   return value.trim().toLowerCase()
@@ -64,11 +70,40 @@ function parseFindingDate(value) {
   return new Date(`${value.replace(' ', 'T')}:00Z`)
 }
 
-function buildTimelineFromFindings(findings, generatedAt) {
+function buildTimelineFromFindings(findings, generatedAt, timelineRange) {
   const baseDate = generatedAt ? new Date(generatedAt) : new Date()
   const buckets = new Map()
 
-  for (let offset = 6; offset >= 0; offset -= 1) {
+  if (timelineRange === '365d') {
+    const currentMonth = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth(), 1))
+
+    for (let offset = 11; offset >= 0; offset -= 1) {
+      const current = new Date(currentMonth)
+      current.setUTCMonth(currentMonth.getUTCMonth() - offset)
+      const key = `${current.getUTCFullYear()}-${String(current.getUTCMonth() + 1).padStart(2, '0')}`
+      buckets.set(key, {
+        date: current.toLocaleDateString('en-GB', {
+          month: 'short',
+          year: 'numeric',
+          timeZone: 'UTC',
+        }),
+        findings: 0,
+      })
+    }
+
+    findings.forEach((finding) => {
+      const findingDate = parseFindingDate(finding.detectedAt)
+      const key = `${findingDate.getUTCFullYear()}-${String(findingDate.getUTCMonth() + 1).padStart(2, '0')}`
+      if (buckets.has(key)) {
+        buckets.get(key).findings += 1
+      }
+    })
+
+    return [...buckets.values()]
+  }
+
+  const totalDays = timelineRange === '30d' ? 30 : 7
+  for (let offset = totalDays - 1; offset >= 0; offset -= 1) {
     const current = new Date(baseDate)
     current.setUTCDate(baseDate.getUTCDate() - offset)
     const key = current.toISOString().slice(0, 10)
@@ -92,14 +127,48 @@ function buildTimelineFromFindings(findings, generatedAt) {
   return [...buckets.values()]
 }
 
-function exportDashboardReport({ findings, summary, severityData, generatedAt, context }) {
-  const reportWindow = window.open('', '_blank', 'noopener,noreferrer,width=1080,height=860')
-  if (!reportWindow) return
+function aggregateCompanies(findings) {
+  const groupedCompanies = new Map()
 
+  findings.forEach((finding) => {
+    const existing = groupedCompanies.get(finding.company) ?? {
+      name: finding.company,
+      count: 0,
+      score: 0,
+      color: severityTheme.Info.chart,
+    }
+
+    existing.count += 1
+    if (finding.riskScore > existing.score) {
+      existing.score = finding.riskScore
+      existing.color = severityTheme[finding.severity]?.chart ?? severityTheme.Info.chart
+    }
+
+    groupedCompanies.set(finding.company, existing)
+  })
+
+  return [...groupedCompanies.values()]
+    .sort((left, right) => {
+      if (right.count !== left.count) return right.count - left.count
+      return right.score - left.score
+    })
+    .slice(0, 5)
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
+function exportDashboardReport({ findings, summary, severityData, generatedAt, context }) {
   const severityRows = severityData
     .map(
       (item) =>
-        `<tr><td>${item.label}</td><td style="text-align:right;">${item.value}</td></tr>`
+        `<tr><td>${escapeHtml(item.label)}</td><td style="text-align:right;">${escapeHtml(item.value)}</td></tr>`
     )
     .join('')
 
@@ -107,22 +176,23 @@ function exportDashboardReport({ findings, summary, severityData, generatedAt, c
     .map(
       (finding) => `
         <tr>
-          <td>${finding.company}</td>
-          <td>${finding.type}</td>
-          <td>${finding.severity}</td>
-          <td>${finding.riskScore}</td>
-          <td>${finding.status}</td>
-          <td>${finding.detectedAt}</td>
+          <td>${escapeHtml(finding.company)}</td>
+          <td>${escapeHtml(finding.type)}</td>
+          <td>${escapeHtml(finding.severity)}</td>
+          <td>${escapeHtml(finding.riskScore)}</td>
+          <td>${escapeHtml(finding.status)}</td>
+          <td>${escapeHtml(finding.detectedAt)}</td>
         </tr>
       `
     )
     .join('')
 
-  reportWindow.document.write(`
+  const printableHtml = `
     <html>
       <head>
         <title>Leak Detection Report</title>
         <style>
+          @page { size: auto; margin: 16mm; }
           body { font-family: Arial, sans-serif; margin: 32px; color: #111827; }
           h1 { margin-bottom: 8px; }
           p { color: #4b5563; }
@@ -134,17 +204,21 @@ function exportDashboardReport({ findings, summary, severityData, generatedAt, c
           th, td { border-bottom: 1px solid #e5e7eb; padding: 10px 8px; text-align: left; font-size: 13px; }
           th { color: #374151; }
           .split { display: grid; grid-template-columns: 280px 1fr; gap: 24px; margin-top: 24px; }
+          .empty { color: #6b7280; font-style: italic; margin-top: 20px; }
+          @media print {
+            body { margin: 0; }
+          }
         </style>
       </head>
       <body>
-        <h1>${context.title}</h1>
-        <p>Generated ${generatedAt}</p>
-        <p>${context.subtitle}</p>
+        <h1>${escapeHtml(context.title)}</h1>
+        <p>Generated ${escapeHtml(generatedAt)}</p>
+        <p>${escapeHtml(context.subtitle)}</p>
         <div class="grid">
-          <div class="card"><div class="label">Total Findings</div><div class="value">${summary.totalFindings}</div></div>
-          <div class="card"><div class="label">Critical Alerts</div><div class="value">${summary.criticalAlerts}</div></div>
-          <div class="card"><div class="label">Reviewed</div><div class="value">${summary.reviewedFindings}</div></div>
-          <div class="card"><div class="label">Companies</div><div class="value">${summary.monitoredCompanies}</div></div>
+          <div class="card"><div class="label">Total Findings</div><div class="value">${escapeHtml(summary.totalFindings)}</div></div>
+          <div class="card"><div class="label">Critical Alerts</div><div class="value">${escapeHtml(summary.criticalAlerts)}</div></div>
+          <div class="card"><div class="label">Reviewed</div><div class="value">${escapeHtml(summary.reviewedFindings)}</div></div>
+          <div class="card"><div class="label">Companies</div><div class="value">${escapeHtml(summary.monitoredCompanies)}</div></div>
         </div>
         <div class="split">
           <div>
@@ -155,31 +229,67 @@ function exportDashboardReport({ findings, summary, severityData, generatedAt, c
           </div>
           <div>
             <h2>Findings</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Company</th>
-                  <th>Type</th>
-                  <th>Severity</th>
-                  <th>Score</th>
-                  <th>Status</th>
-                  <th>Detected At</th>
-                </tr>
-              </thead>
-              <tbody>${findingRows}</tbody>
-            </table>
+            ${findingRows
+              ? `
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Company</th>
+                      <th>Type</th>
+                      <th>Severity</th>
+                      <th>Score</th>
+                      <th>Status</th>
+                      <th>Detected At</th>
+                    </tr>
+                  </thead>
+                  <tbody>${findingRows}</tbody>
+                </table>
+              `
+              : '<p class="empty">No findings in the current report view.</p>'}
           </div>
         </div>
       </body>
     </html>
-  `)
-  reportWindow.document.close()
-  reportWindow.focus()
-  reportWindow.print()
+  `
+
+  const printFrame = document.createElement('iframe')
+  printFrame.style.position = 'fixed'
+  printFrame.style.right = '0'
+  printFrame.style.bottom = '0'
+  printFrame.style.width = '0'
+  printFrame.style.height = '0'
+  printFrame.style.border = '0'
+  printFrame.setAttribute('aria-hidden', 'true')
+  document.body.appendChild(printFrame)
+
+  const cleanup = () => {
+    window.setTimeout(() => {
+      if (printFrame.parentNode) {
+        printFrame.parentNode.removeChild(printFrame)
+      }
+    }, 300)
+  }
+
+  const frameDocument = printFrame.contentWindow?.document
+  if (!frameDocument || !printFrame.contentWindow) {
+    cleanup()
+    return
+  }
+
+  frameDocument.open()
+  frameDocument.write(printableHtml)
+  frameDocument.close()
+
+  window.setTimeout(() => {
+    printFrame.contentWindow.focus()
+    printFrame.contentWindow.print()
+    cleanup()
+  }, 250)
 }
 
 function Dashboard() {
   const [activeItem, setActiveItem] = useState('dashboard')
+  const [timelineRange, setTimelineRange] = useState('7d')
   const [searchValue, setSearchValue] = useState('')
   const [companyFilter, setCompanyFilter] = useState('All Companies')
   const [severityFilter, setSeverityFilter] = useState('All Severity')
@@ -204,12 +314,11 @@ function Dashboard() {
       setLoadError('')
 
       try {
-        const data = await getDashboardOverview()
+        const data = await getDashboardOverview(timelineRange)
         if (!isActive) return
 
         startTransition(() => {
           setDashboardData(data)
-          setCurrentPage(1)
         })
       } catch (error) {
         if (!isActive) return
@@ -228,7 +337,7 @@ function Dashboard() {
       isActive = false
       window.clearInterval(intervalId)
     }
-  }, [])
+  }, [timelineRange])
 
   const findings = dashboardData?.findings ?? []
   const liveFeed = dashboardData?.live_feed ?? []
@@ -323,6 +432,16 @@ function Dashboard() {
     currentPage * ITEMS_PER_PAGE
   )
 
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [companyFilter, severityFilter, statusFilter, sortBy])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
+
   const criticalAlerts = [...findings]
     .filter((finding) => finding.severity === 'Critical' || finding.severity === 'High')
     .sort((left, right) => right.riskScore - left.riskScore)
@@ -351,7 +470,7 @@ function Dashboard() {
     : summary
 
   const visibleTimelineData = hasActiveFilterContext
-    ? buildTimelineFromFindings(filteredFindings, dashboardData?.generated_at)
+    ? buildTimelineFromFindings(filteredFindings, dashboardData?.generated_at, timelineRange)
     : timelineData
 
   const severityData = (() => {
@@ -379,15 +498,7 @@ function Dashboard() {
           score: company.score,
           color: severityTheme[company.severity]?.chart ?? severityTheme.Info.chart,
         }))
-      : [...filteredFindings]
-          .sort((left, right) => right.riskScore - left.riskScore)
-          .slice(0, 5)
-          .map((finding) => ({
-            name: finding.company,
-            count: 1,
-            score: finding.riskScore,
-            color: severityTheme[finding.severity]?.chart ?? severityTheme.Info.chart,
-          }))
+      : aggregateCompanies(filteredFindings)
 
   const statCards = [
     {
@@ -428,16 +539,25 @@ function Dashboard() {
     },
   ]
 
+  const scrollToSection = (sectionId) => {
+    const section = document.getElementById(sectionId)
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
   const handleSelectItem = (itemId) => {
     setActiveItem(itemId)
     if (itemId === 'reports') {
       setIsReportOpen(true)
       return
     }
-    const section = document.getElementById(itemId)
-    if (section) {
-      section.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
+    scrollToSection(itemId)
+  }
+
+  const handleViewAllAlerts = () => {
+    setSortBy('score-desc')
+    scrollToSection('findings')
   }
 
   const handlePageChange = (page) => {
@@ -504,14 +624,30 @@ function Dashboard() {
       })
     : summary.latest_collection || 'No scan data'
 
+  const reportSeverityData = ['Critical', 'High', 'Medium', 'Low', 'Info']
+    .map((label) => ({
+      label,
+      value: sortedFindings.filter((finding) => finding.severity === label).length,
+      color: severityTheme[label].chart,
+    }))
+    .filter((entry) => entry.value > 0)
+
   const reportSummary = {
-    totalFindings: visibleSummary.total_findings,
-    criticalAlerts: visibleSummary.critical_alerts,
-    reviewedFindings: visibleSummary.reviewed_findings,
-    monitoredCompanies: visibleSummary.monitored_companies,
+    totalFindings: sortedFindings.length,
+    criticalAlerts: sortedFindings.filter(
+      (finding) => finding.severity === 'Critical' || finding.severity === 'High'
+    ).length,
+    reviewedFindings: sortedFindings.filter((finding) => isResolvedStatus(finding.status)).length,
+    monitoredCompanies: new Set(sortedFindings.map((finding) => finding.company)).size,
   }
+  const reportTimelineData = buildTimelineFromFindings(
+    sortedFindings,
+    dashboardData?.generated_at,
+    timelineRange
+  )
+  const reportTopCompanies = aggregateCompanies(sortedFindings)
   const reportSourceBreakdown = Object.values(
-    filteredFindings.reduce((accumulator, finding) => {
+    sortedFindings.reduce((accumulator, finding) => {
       if (!accumulator[finding.source]) {
         accumulator[finding.source] = {
           label: finding.source,
@@ -543,7 +679,7 @@ function Dashboard() {
     : {
         title: 'Leak Detection Report',
         subtitle:
-          'This report condenses the active findings queue, severity distribution, and company pressure trend from the current dashboard view into a printable analyst snapshot.',
+          'This report condenses the current dashboard view into a printable analyst snapshot, including the visible findings list, severity split, and company pressure trend.',
       }
 
   const rightPanel = (
@@ -616,7 +752,11 @@ function Dashboard() {
         ))}
       </section>
 
-      <LatestCriticalAlerts alerts={visibleAlerts} searchValue={searchValue} />
+      <LatestCriticalAlerts
+        alerts={visibleAlerts}
+        onViewAll={handleViewAllAlerts}
+        searchValue={searchValue}
+      />
 
       <RecentFindings
         actions={
@@ -664,7 +804,10 @@ function Dashboard() {
           title="Findings by Severity"
         >
           <div className="grid gap-2 xl:grid-cols-[132px_1fr] xl:items-center">
-            <SeverityDonutChart data={severityData} total={filteredFindings.length} />
+            <SeverityDonutChart
+              data={severityData}
+              total={hasActiveFilterContext ? filteredFindings.length : visibleSummary.total_findings}
+            />
             <div className="space-y-2">
               {severityData.map((item) => (
                 <div className="flex items-center justify-between gap-3 text-[12px]" key={item.label}>
@@ -683,7 +826,13 @@ function Dashboard() {
         </StatusCard>
 
         <StatusCard
-          subtitle="Daily detection trend over the last seven days."
+          actions={
+            <TimelineRangeSelector
+              onChange={setTimelineRange}
+              value={timelineRange}
+            />
+          }
+          subtitle={`Detection trend for the ${TIMELINE_RANGE_LABELS[timelineRange]}.`}
           title="Findings Over Time"
         >
           <FindingsLineChart data={visibleTimelineData} />
@@ -700,6 +849,7 @@ function Dashboard() {
 
       {isReportOpen ? (
         <ReportModal
+          key={`${companyFilter}-${severityFilter}-${statusFilter}-${sortBy}-${timelineRange}-${sortedFindings.length}`}
           findings={sortedFindings}
           generatedAt={generatedLabel}
           onClose={() => setIsReportOpen(false)}
@@ -707,7 +857,7 @@ function Dashboard() {
             exportDashboardReport({
               findings: sortedFindings,
               summary: reportSummary,
-              severityData,
+              severityData: reportSeverityData,
               generatedAt: generatedLabel,
               context: reportContext,
             })
@@ -716,10 +866,12 @@ function Dashboard() {
           companyName={companyFilter}
           context={reportContext}
           focusedCompanyInsights={focusedCompanyInsights}
+          onTimelineRangeChange={setTimelineRange}
           sourceBreakdown={reportSourceBreakdown}
-          timelineData={visibleTimelineData}
-          topCompanies={topCompanies}
-          severityData={severityData}
+          timelineData={reportTimelineData}
+          timelineRange={timelineRange}
+          topCompanies={reportTopCompanies}
+          severityData={reportSeverityData}
           summary={reportSummary}
         />
       ) : null}

@@ -57,8 +57,7 @@ function FindingsTable({
             value={statusFilter}
           >
             <option value="All Status">All Status</option>
-            <option value="New">New</option>
-            <option value="Reviewing">Reviewing</option>
+            <option value="Not Reviewed">Not Reviewed</option>
             <option value="Reviewed">Reviewed</option>
             <option value="False Positive">False Positive</option>
             <option value="Escalated">Escalated</option>

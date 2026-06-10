@@ -23,6 +23,8 @@ function FindingsLineChart({ data }) {
           <XAxis
             axisLine={false}
             dataKey="date"
+            interval="preserveStartEnd"
+            minTickGap={16}
             tick={{ fill: '#94a3b8', fontSize: 10 }}
             tickLine={false}
           />
