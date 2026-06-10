@@ -5,7 +5,6 @@ function DataSourcesCard({ items }) {
   return (
     <StatusCard
       id="data-sources-panel"
-      actionLabel="View All"
       subtitle="Connected sources"
       title="Data Sources"
     >
