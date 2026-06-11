@@ -346,6 +346,8 @@ class AccountRegistrar:
         if captcha_fields is None:
             logger.error(f"[{self.forum['id']}] CAPTCHA could not be solved — registration cancelled")
             return None
+        if captcha_fields:
+            logger.info(f"[{self.forum['id']}] CAPTCHA solved successfully")
 
         # Create POST payload
         field_map = self.gen_cfg.get("fields", {})
