@@ -21,9 +21,13 @@ import logging
 import os
 import re
 from enum import Enum, auto
+from pathlib import Path
 from typing import List, Optional, Union
 
 import requests
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
 
 logger = logging.getLogger(__name__)
 
