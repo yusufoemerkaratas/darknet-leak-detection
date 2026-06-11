@@ -1,7 +1,11 @@
+import { useState } from 'react'
 import { AlertTriangle, Download, ShieldCheck, Users, X } from 'lucide-react'
 import FindingsLineChart from '../charts/FindingsLineChart'
 import SeverityDonutChart from '../charts/SeverityDonutChart'
 import CompaniesBarChart from '../charts/CompaniesBarChart'
+import TimelineRangeSelector from './TimelineRangeSelector'
+
+const FINDINGS_PAGE_SIZE = 6
 
 function ReportModal({
   findings,
@@ -14,10 +18,20 @@ function ReportModal({
   focusedCompanyInsights,
   sourceBreakdown,
   timelineData,
+  timelineRange,
   topCompanies,
+  onTimelineRangeChange,
   onClose,
   onExport,
 }) {
+  const [findingsPage, setFindingsPage] = useState(1)
+  const findingsTotalPages = Math.max(1, Math.ceil(findings.length / FINDINGS_PAGE_SIZE))
+  const findingsStartIndex = (findingsPage - 1) * FINDINGS_PAGE_SIZE
+  const visibleFindings = findings.slice(
+    findingsStartIndex,
+    findingsStartIndex + FINDINGS_PAGE_SIZE
+  )
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6 backdrop-blur-sm"
@@ -49,7 +63,7 @@ function ReportModal({
             >
               <span className="inline-flex items-center gap-1.5">
                 <Download className="h-3.5 w-3.5" />
-                Export PDF
+                Print / Save PDF
               </span>
             </button>
             <button
@@ -96,7 +110,7 @@ function ReportModal({
                   Review Coverage
                 </p>
                 <p className="mt-1 text-[1.15rem] font-semibold text-white">
-                  {summary.reviewedFindings} resolved items
+                  {summary.reviewedFindings} reviewed items
                 </p>
               </div>
               <div className="rounded-2xl border border-slate-700/70 bg-slate-950/45 px-3 py-2.5">
@@ -134,7 +148,15 @@ function ReportModal({
           </div>
 
           <div className="rounded-[18px] border border-slate-800 bg-slate-950/45 p-3.5">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Findings Over Time</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">
+                Findings Over Time
+              </p>
+              <TimelineRangeSelector
+                onChange={onTimelineRangeChange}
+                value={timelineRange}
+              />
+            </div>
             <div className="mt-2">
               <FindingsLineChart data={timelineData} />
             </div>
@@ -190,23 +212,64 @@ function ReportModal({
           </div>
 
           <div className="rounded-[18px] border border-slate-800 bg-slate-950/45 p-3.5">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Included Findings</p>
-            <div className="mt-3 space-y-2">
-              {findings.map((finding) => (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">
+                Included Findings
+              </p>
+              <p className="text-[10px] text-slate-500">
+                {findings.length === 0
+                  ? '0 results'
+                  : `${findingsStartIndex + 1}-${Math.min(findingsStartIndex + visibleFindings.length, findings.length)} of ${findings.length}`}
+              </p>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {visibleFindings.map((finding) => (
                 <div
                   className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2"
                   key={finding.id}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[12px] font-medium text-white">{finding.company}</p>
-                    <span className="text-[10px] text-slate-500">{finding.detectedAt}</span>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-[12px] font-medium text-white">
+                        {finding.company}
+                      </p>
+                      <p className="truncate text-[11px] text-slate-400">{finding.type}</p>
+                    </div>
+                    <span className="shrink-0 text-[10px] text-slate-500">
+                      {finding.detectedAt}
+                    </span>
                   </div>
                   <p className="mt-1 text-[11px] text-slate-300">
-                    {finding.type} • {finding.status} • Score {finding.riskScore}
+                    {finding.status} • Score {finding.riskScore}
                   </p>
                 </div>
               ))}
             </div>
+            {findingsTotalPages > 1 ? (
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <button
+                  className="rounded-md border border-slate-800 bg-slate-950/80 px-2.5 py-1 text-[11px] text-slate-300 disabled:opacity-40"
+                  disabled={findingsPage === 1}
+                  onClick={() => setFindingsPage((current) => Math.max(1, current - 1))}
+                  type="button"
+                >
+                  Previous
+                </button>
+                <span className="text-[11px] text-slate-500">
+                  Page {findingsPage} / {findingsTotalPages}
+                </span>
+                <button
+                  className="rounded-md border border-slate-800 bg-slate-950/80 px-2.5 py-1 text-[11px] text-slate-300 disabled:opacity-40"
+                  disabled={findingsPage === findingsTotalPages}
+                  onClick={() =>
+                    setFindingsPage((current) => Math.min(findingsTotalPages, current + 1))
+                  }
+                  type="button"
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

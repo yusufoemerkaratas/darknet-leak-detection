@@ -1,9 +1,9 @@
-from collections import Counter, defaultdict
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Optional
+from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, joinedload
@@ -62,8 +62,7 @@ TYPE_KEYWORDS = {
 }
 
 REVIEW_STATUS_OPTIONS = {
-    "New",
-    "Reviewing",
+    "Not Reviewed",
     "Reviewed",
     "False Positive",
     "Escalated",
@@ -76,7 +75,7 @@ PREVIEW_FINDINGS = [
         "type": "Credential Leak",
         "severity": "Critical",
         "risk_score": 92,
-        "status": "New",
+        "status": "Not Reviewed",
         "detected_at_offset": {"minutes": 6},
         "source": "Paste Site",
         "affected": "Affected: 312 emails",
@@ -96,7 +95,7 @@ PREVIEW_FINDINGS = [
         "type": "Password Dump",
         "severity": "High",
         "risk_score": 84,
-        "status": "Reviewing",
+        "status": "Not Reviewed",
         "detected_at_offset": {"minutes": 22},
         "source": "Leak Database",
         "affected": "Estimated size: 1.80 MB",
@@ -116,7 +115,7 @@ PREVIEW_FINDINGS = [
         "type": "Email Exposure",
         "severity": "Medium",
         "risk_score": 67,
-        "status": "Reviewing",
+        "status": "Not Reviewed",
         "detected_at_offset": {"hours": 1, "minutes": 12},
         "source": "Dark Web Forum",
         "affected": "Affected: 128 emails",
@@ -136,7 +135,7 @@ PREVIEW_FINDINGS = [
         "type": "Database Leak",
         "severity": "Critical",
         "risk_score": 95,
-        "status": "New",
+        "status": "Not Reviewed",
         "detected_at_offset": {"hours": 3, "minutes": 8},
         "source": "Breach Archive",
         "affected": "Estimated size: 5.30 MB",
@@ -176,7 +175,7 @@ PREVIEW_FINDINGS = [
         "type": "Archive Exposure",
         "severity": "High",
         "risk_score": 79,
-        "status": "New",
+        "status": "Not Reviewed",
         "detected_at_offset": {"hours": 9, "minutes": 45},
         "source": "Forum Thread",
         "affected": "Estimated size: 2.40 MB",
@@ -209,6 +208,10 @@ def _format_day_label(value: datetime) -> str:
     return value.strftime("%b %d").replace(" 0", " ")
 
 
+def _format_month_label(value: datetime) -> str:
+    return value.strftime("%b %Y")
+
+
 def _get_detected_patterns(record: LeakRecord) -> dict:
     if (
         record.analysis_result
@@ -230,6 +233,18 @@ def _normalize_severity(value: Optional[str]) -> str:
         return "Info"
     lowered = value.lower()
     return lowered.capitalize() if lowered != "info" else "Info"
+
+
+def _severity_from_score(score: int) -> str:
+    if score >= 90:
+        return "Critical"
+    if score >= 70:
+        return "High"
+    if score >= 40:
+        return "Medium"
+    if score >= 1:
+        return "Low"
+    return "Info"
 
 
 def _infer_finding_type(record: LeakRecord) -> str:
@@ -266,13 +281,7 @@ def _compute_status(record: LeakRecord) -> str:
     review_status = _get_review_status(record)
     if review_status:
         return review_status
-
-    severity = (record.severity or "").lower()
-    if record.is_analyzed:
-        return "Reviewed"
-    if severity in {"critical", "high"}:
-        return "New"
-    return "Reviewing"
+    return "Not Reviewed"
 
 
 def _compute_risk_score(record: LeakRecord) -> int:
@@ -427,7 +436,97 @@ def _build_feed_title(finding_type: str) -> str:
     return "New leak signal ingested"
 
 
-def _empty_dashboard_overview() -> DashboardOverviewOut:
+def _shift_months(value: datetime, offset: int) -> datetime:
+    month_index = value.month - 1 + offset
+    year = value.year + month_index // 12
+    month = month_index % 12 + 1
+    return value.replace(year=year, month=month, day=1)
+
+
+def _build_preview_timeline(
+    now: datetime,
+    timeline_range: Literal["7d", "30d", "365d"],
+) -> list[DashboardTimelinePointOut]:
+    if timeline_range == "365d":
+        base = now.replace(day=1)
+        labels = [_shift_months(base, offset) for offset in range(-11, 1)]
+        values = [1, 1, 2, 3, 2, 4, 3, 5, 4, 6, 5, 3]
+        return [
+            DashboardTimelinePointOut(date=_format_month_label(label), findings=value)
+            for label, value in zip(labels, values)
+        ]
+
+    total_days = 30 if timeline_range == "30d" else 7
+    sample_pattern = [1, 2, 1, 3, 2, 4, 3]
+    values = [sample_pattern[index % len(sample_pattern)] for index in range(total_days)]
+    return [
+        DashboardTimelinePointOut(
+            date=_format_day_label(
+                datetime.combine(
+                    now.date() - timedelta(days=total_days - index - 1),
+                    datetime.min.time(),
+                    tzinfo=timezone.utc,
+                )
+            ),
+            findings=values[index],
+        )
+        for index in range(total_days)
+    ]
+
+
+def _build_timeline(
+    timestamps: list[datetime],
+    timeline_range: Literal["7d", "30d", "365d"],
+    reference_now: Optional[datetime] = None,
+) -> list[DashboardTimelinePointOut]:
+    now = reference_now or datetime.now(timezone.utc)
+
+    if timeline_range == "365d":
+        current_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        buckets = {
+            (month.year, month.month): 0
+            for month in (_shift_months(current_month, offset) for offset in range(-11, 1))
+        }
+
+        for timestamp in timestamps:
+            normalized = timestamp.astimezone(timezone.utc)
+            key = (normalized.year, normalized.month)
+            if key in buckets:
+                buckets[key] += 1
+
+        return [
+            DashboardTimelinePointOut(
+                date=_format_month_label(
+                    datetime(year=year, month=month, day=1, tzinfo=timezone.utc)
+                ),
+                findings=count,
+            )
+            for (year, month), count in buckets.items()
+        ]
+
+    total_days = 30 if timeline_range == "30d" else 7
+    today = now.date()
+    buckets = {today - timedelta(days=offset): 0 for offset in range(total_days - 1, -1, -1)}
+
+    for timestamp in timestamps:
+        collected_day = timestamp.astimezone(timezone.utc).date()
+        if collected_day in buckets:
+            buckets[collected_day] += 1
+
+    return [
+        DashboardTimelinePointOut(
+            date=_format_day_label(
+                datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
+            ),
+            findings=count,
+        )
+        for day, count in buckets.items()
+    ]
+
+
+def _empty_dashboard_overview(
+    timeline_range: Literal["7d", "30d", "365d"] = "7d",
+) -> DashboardOverviewOut:
     now = datetime.now(timezone.utc)
     fake_findings = [_serialize_preview_finding(item, now=now) for item in PREVIEW_FINDINGS]
     reviewed_count = sum(1 for item in PREVIEW_FINDINGS if item["status"] == "Reviewed")
@@ -462,13 +561,7 @@ def _empty_dashboard_overview() -> DashboardOverviewOut:
             reverse=True,
         )[:3],
         live_feed=fake_live_feed,
-        timeline=[
-            DashboardTimelinePointOut(
-                date=(now.date() - timedelta(days=offset)).strftime("%b %d").replace(" 0", " "),
-                findings=value,
-            )
-            for offset, value in zip(range(6, -1, -1), [1, 2, 1, 3, 2, 4, 3])
-        ],
+        timeline=_build_preview_timeline(now, timeline_range),
         data_sources=[
             DashboardSourceMetricOut(id=1, label="Paste Site", value="124"),
             DashboardSourceMetricOut(id=2, label="Dark Web Forum", value="87"),
@@ -516,7 +609,9 @@ def _empty_dashboard_overview() -> DashboardOverviewOut:
         ],
         detection_engine=DashboardDetectionEngineOut(
             model_status="Preview",
-            success_rate=96.4,
+            analysis_coverage=83.3,
+            analyzed_findings=5,
+            pending_findings=1,
         ),
         sidebar_status_cards=[
             DashboardStatusCardOut(
@@ -544,7 +639,8 @@ def _empty_dashboard_overview() -> DashboardOverviewOut:
                         tone="text-amber-300",
                     ),
                     DashboardStatusRowOut(label="Data Sources", value="4"),
-                    DashboardStatusRowOut(label="Success Rate", value="96.4%"),
+                    DashboardStatusRowOut(label="Analyzed Records", value="5 / 6"),
+                    DashboardStatusRowOut(label="Analysis Coverage", value="83.3%"),
                     DashboardStatusRowOut(label="Last Scan", value="Preview mode"),
                 ],
             ),
@@ -568,11 +664,15 @@ def _apply_review_status(record: LeakRecord, status: str) -> None:
     else:
         record.analysis_result = AnalysisResult(detected_patterns=patterns)
 
-    record.is_analyzed = status in {"Reviewed", "False Positive"}
+    record.is_reviewed = status != "Not Reviewed"
+    record.is_false_positive = status == "False Positive"
 
 
 @router.get("/overview", response_model=DashboardOverviewOut)
-def dashboard_overview(db: Session = Depends(get_db)):
+def dashboard_overview(
+    timeline_range: Literal["7d", "30d", "365d"] = Query(default="7d"),
+    db: Session = Depends(get_db),
+):
     try:
         active_sources = (
             db.query(func.count(Source.id))
@@ -593,9 +693,15 @@ def dashboard_overview(db: Session = Depends(get_db)):
         )
 
         total_findings = db.query(func.count(LeakRecord.id)).scalar() or 0
-        reviewed_findings = (
+        analyzed_findings = (
             db.query(func.count(LeakRecord.id))
             .filter(LeakRecord.is_analyzed.is_(True))
+            .scalar()
+            or 0
+        )
+        reviewed_findings = (
+            db.query(func.count(LeakRecord.id))
+            .filter(LeakRecord.is_reviewed.is_(True))
             .scalar()
             or 0
         )
@@ -631,7 +737,14 @@ def dashboard_overview(db: Session = Depends(get_db)):
             for index, finding in enumerate(serialized_findings[:4])
         ]
 
-        severity_counter = Counter(finding.severity for finding in serialized_findings)
+        severity_rows = (
+            db.query(func.lower(LeakRecord.severity).label("severity"), func.count(LeakRecord.id))
+            .group_by(func.lower(LeakRecord.severity))
+            .all()
+        )
+        severity_counter = Counter()
+        for severity, count in severity_rows:
+            severity_counter[_normalize_severity(severity)] = count
         severity_order = ["Critical", "High", "Medium", "Low", "Info"]
         severity_breakdown = [
             DashboardSeverityOut(label=label, value=severity_counter.get(label, 0))
@@ -652,46 +765,52 @@ def dashboard_overview(db: Session = Depends(get_db)):
             for row in source_rows
         ]
 
-        company_aggregate: dict[str, dict[str, int | str]] = defaultdict(
-            lambda: {"count": 0, "score": 0, "severity": "Info"}
-        )
-        for finding in serialized_findings:
-            entry = company_aggregate[finding.company]
-            entry["count"] += 1
-            if finding.risk_score > entry["score"]:
-                entry["score"] = finding.risk_score
-                entry["severity"] = finding.severity
-
-        top_companies = sorted(
-            [
-                DashboardCompanyPressureOut(
-                    name=name,
-                    count=int(values["count"]),
-                    score=int(values["score"]),
-                    severity=str(values["severity"]),
-                )
-                for name, values in company_aggregate.items()
-            ],
-            key=lambda item: (item.count, item.score),
-            reverse=True,
-        )[:5]
-
-        today = datetime.now(timezone.utc).date()
-        timeline_buckets = {today - timedelta(days=offset): 0 for offset in range(6, -1, -1)}
-        for record in records:
-            collected_day = (record.collected_at or record.published_at).astimezone(timezone.utc).date()
-            if collected_day in timeline_buckets:
-                timeline_buckets[collected_day] += 1
-
-        timeline = [
-            DashboardTimelinePointOut(
-                date=day.strftime("%b %d").replace(" 0", " "),
-                findings=count,
+        company_rows = (
+            db.query(
+                Company.name.label("name"),
+                func.count(LeakRecord.id).label("count"),
+                func.max(LeakRecord.risk_score).label("score"),
             )
-            for day, count in timeline_buckets.items()
+            .join(LeakRecord, LeakRecord.company_id == Company.id)
+            .group_by(Company.id, Company.name)
+            .order_by(func.count(LeakRecord.id).desc(), func.max(LeakRecord.risk_score).desc())
+            .limit(5)
+            .all()
+        )
+        top_companies = [
+            DashboardCompanyPressureOut(
+                name=row.name,
+                count=int(row.count or 0),
+                score=int(row.score or 0),
+                severity=_severity_from_score(int(row.score or 0)),
+            )
+            for row in company_rows
         ]
 
-        success_rate = round((reviewed_findings / total_findings) * 100, 1) if total_findings else 0.0
+        now = datetime.now(timezone.utc)
+        timeline_window_days = 365 if timeline_range == "365d" else 30 if timeline_range == "30d" else 7
+        timeline_start = now - timedelta(days=timeline_window_days - 1)
+        timeline_rows = (
+            db.query(LeakRecord.collected_at, LeakRecord.published_at)
+            .filter(func.coalesce(LeakRecord.collected_at, LeakRecord.published_at) >= timeline_start)
+            .all()
+        )
+        timeline = _build_timeline(
+            [
+                (row.collected_at or row.published_at)
+                for row in timeline_rows
+                if (row.collected_at or row.published_at) is not None
+            ],
+            timeline_range,
+            reference_now=now,
+        )
+
+        pending_findings = max(total_findings - analyzed_findings, 0)
+        analysis_coverage = (
+            round((analyzed_findings / total_findings) * 100, 1) if total_findings else 0.0
+        )
+        if pending_findings > 0 and analysis_coverage >= 100.0:
+            analysis_coverage = 99.9
         latest_collection_label = _format_compact_date(latest_collection_dt) or "No scans yet"
 
         sidebar_status_cards = [
@@ -728,8 +847,12 @@ def dashboard_overview(db: Session = Depends(get_db)):
                         value=str(active_sources),
                     ),
                     DashboardStatusRowOut(
-                        label="Success Rate",
-                        value=f"{success_rate:.1f}%",
+                        label="Analyzed Records",
+                        value=f"{analyzed_findings:,} / {total_findings:,}",
+                    ),
+                    DashboardStatusRowOut(
+                        label="Analysis Coverage",
+                        value=f"{analysis_coverage:.1f}%",
                     ),
                     DashboardStatusRowOut(
                         label="Last Scan",
@@ -740,7 +863,7 @@ def dashboard_overview(db: Session = Depends(get_db)):
         ]
 
         return DashboardOverviewOut(
-            generated_at=datetime.now(timezone.utc).isoformat(),
+            generated_at=now.isoformat(),
             summary=DashboardSummaryOut(
                 total_findings=total_findings,
                 critical_alerts=critical_alerts_count,
@@ -758,12 +881,14 @@ def dashboard_overview(db: Session = Depends(get_db)):
             top_companies=top_companies,
             detection_engine=DashboardDetectionEngineOut(
                 model_status="Active",
-                success_rate=success_rate,
+                analysis_coverage=analysis_coverage,
+                analyzed_findings=analyzed_findings,
+                pending_findings=pending_findings,
             ),
             sidebar_status_cards=sidebar_status_cards,
         )
     except OperationalError:
-        return _empty_dashboard_overview()
+        return _empty_dashboard_overview(timeline_range)
 
 
 @router.get("/findings/{finding_id}", response_model=DashboardFindingDetailOut)

@@ -2,11 +2,12 @@ import { AlertOctagon } from 'lucide-react'
 import StatusCard from '../cards/StatusCard'
 import { getSeverityTheme } from '../../styles/theme'
 
-function LatestCriticalAlerts({ alerts, searchValue }) {
+function LatestCriticalAlerts({ alerts, onViewAll, searchValue }) {
   return (
     <StatusCard
       actionLabel="View All Alerts"
       id="alerts"
+      onAction={onViewAll}
       subtitle="Newest high-risk findings requiring immediate review."
       title="Latest Critical Alerts"
     >

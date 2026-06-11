@@ -1,4 +1,4 @@
-function DetectionGaugeChart({ value }) {
+function DetectionGaugeChart({ label = 'Analysis Coverage', value }) {
   const clamped = Math.max(0, Math.min(100, value))
   const radius = 80
   const circumference = Math.PI * radius
@@ -34,7 +34,7 @@ function DetectionGaugeChart({ value }) {
 
       <div className="absolute top-[40%] text-center">
         <p className="font-display text-[1.45rem] font-semibold text-white">{value}%</p>
-        <p className="text-[10px] text-slate-400">Success Rate</p>
+        <p className="text-[10px] text-slate-400">{label}</p>
       </div>
     </div>
   )

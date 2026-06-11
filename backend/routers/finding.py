@@ -278,7 +278,6 @@ def mark_finding_reviewed(
         return {"error": "Finding not found"}
 
     finding.is_reviewed = True
-    finding.is_analyzed = True
 
     if review_notes:
         finding.review_notes = review_notes
@@ -310,7 +309,6 @@ def mark_false_positive(
 
     finding.is_false_positive = True
     finding.is_reviewed = True
-    finding.is_analyzed = True
     finding.review_notes = review_notes
 
     db.commit()
