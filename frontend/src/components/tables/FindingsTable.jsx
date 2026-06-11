@@ -76,7 +76,58 @@ function FindingsTable({
         </select>
       </div>
 
-      <div className="overflow-x-auto rounded-[11px] border border-slate-800/80 bg-[#040913]">
+      <div className="space-y-2 md:hidden">
+        {findings.length === 0 ? (
+          <div className="rounded-[11px] border border-slate-800/80 bg-[#040913] px-3 py-6 text-center text-[11px] text-slate-400">
+            No findings matched the current search and filters.
+          </div>
+        ) : null}
+
+        {findings.map((finding) => {
+          const severityTone = getSeverityTheme(finding.severity)
+          const statusTone = getStatusTheme(finding.status)
+
+          return (
+            <button
+              className="w-full rounded-[11px] border border-slate-800/80 bg-[#040913] p-3 text-left transition hover:border-slate-700"
+              key={finding.id}
+              onClick={onSelectFinding ? () => onSelectFinding(finding) : undefined}
+              type="button"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-[12px] font-medium text-slate-100">
+                    {finding.company}
+                  </p>
+                  <p className="mt-0.5 truncate text-[11px] text-slate-400">{finding.type}</p>
+                </div>
+                <span
+                  className={`inline-flex min-w-10 justify-center rounded-md px-2 py-0.5 text-[10px] font-semibold ${severityTone.score}`}
+                >
+                  {finding.riskScore}
+                </span>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span
+                  className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${severityTone.badge}`}
+                >
+                  {finding.severity}
+                </span>
+                <span
+                  className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${statusTone}`}
+                >
+                  {finding.status}
+                </span>
+              </div>
+
+              <p className="mt-3 text-[10px] text-slate-500">{finding.detectedAt}</p>
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-[11px] border border-slate-800/80 bg-[#040913] md:block">
         <table className="min-w-full divide-y divide-slate-800 text-left">
           <thead>
             <tr className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
@@ -141,9 +192,10 @@ function FindingsTable({
       </div>
 
       <div className="flex flex-col gap-2 text-[11px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-        <p>
+        <p className="leading-5">
           Showing {findings.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to{' '}
           {(currentPage - 1) * itemsPerPage + findings.length} of {totalResults} results
+          {totalPages > 0 ? ` • Page ${currentPage} of ${totalPages}` : ''}
         </p>
 
         <div className="flex items-center gap-2">

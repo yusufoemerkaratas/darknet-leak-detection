@@ -63,7 +63,7 @@ def stats(db: Session = Depends(get_db)):
     Returns a real-time summary of collection and analysis status.
 
     For the analyzer:
-      - pending_analysis: number of records not yet reviewed
+      - pending_analysis: number of records not yet analyzed by the pipeline
       - total_emails_found: total number of email addresses found in all records
       - records_per_source: how many records came from which forum
 

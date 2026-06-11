@@ -67,7 +67,16 @@ function isResolvedStatus(status) {
 }
 
 function parseFindingDate(value) {
-  return new Date(`${value.replace(' ', 'T')}:00Z`)
+  if (!value) return new Date(0)
+
+  const normalizedValue = value.includes('T') ? value : value.replace(' ', 'T')
+  const withTimezone =
+    normalizedValue.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(normalizedValue)
+      ? normalizedValue
+      : `${normalizedValue}:00Z`
+
+  const parsedDate = new Date(withTimezone)
+  return Number.isNaN(parsedDate.getTime()) ? new Date(0) : parsedDate
 }
 
 function buildTimelineFromFindings(findings, generatedAt, timelineRange) {
@@ -350,7 +359,9 @@ function Dashboard() {
   const sidebarStatusCards = dashboardData?.sidebar_status_cards ?? []
   const detectionEngine = dashboardData?.detection_engine ?? {
     model_status: 'Offline',
-    success_rate: 0,
+    analysis_coverage: 0,
+    analyzed_findings: 0,
+    pending_findings: 0,
   }
   const summary = dashboardData?.summary ?? {
     total_findings: 0,
@@ -364,10 +375,16 @@ function Dashboard() {
     setDashboardData((currentData) => {
       if (!currentData) return currentData
 
+      const previousFinding = (currentData.findings ?? []).find(
+        (finding) => finding.id === updatedFinding.id
+      )
       const nextFindings = (currentData.findings ?? []).map((finding) =>
         finding.id === updatedFinding.id ? { ...finding, ...updatedFinding } : finding
       )
-      const reviewedFindings = nextFindings.filter((finding) =>
+      const reviewedDelta =
+        Number(isResolvedStatus(updatedFinding.status)) -
+        Number(isResolvedStatus(previousFinding?.status))
+      const fallbackReviewedCount = nextFindings.filter((finding) =>
         isResolvedStatus(finding.status)
       ).length
 
@@ -379,7 +396,10 @@ function Dashboard() {
         ),
         summary: {
           ...currentData.summary,
-          reviewed_findings: reviewedFindings,
+          reviewed_findings: Math.max(
+            0,
+            (currentData.summary?.reviewed_findings ?? fallbackReviewedCount) + reviewedDelta
+          ),
         },
       }
     })
@@ -415,10 +435,10 @@ function Dashboard() {
       if (sortBy === 'score-desc') return right.riskScore - left.riskScore
       if (sortBy === 'score-asc') return left.riskScore - right.riskScore
       if (sortBy === 'newest') {
-        return new Date(right.detectedAt) - new Date(left.detectedAt)
+        return parseFindingDate(right.detectedAt) - parseFindingDate(left.detectedAt)
       }
       if (sortBy === 'oldest') {
-        return new Date(left.detectedAt) - new Date(right.detectedAt)
+        return parseFindingDate(left.detectedAt) - parseFindingDate(right.detectedAt)
       }
       return 0
     })
@@ -523,7 +543,7 @@ function Dashboard() {
       icon: BadgeCheck,
       label: 'Reviewed',
       value: visibleSummary.reviewed_findings,
-      detail: 'Analyzed records',
+      detail: 'Reviewed records',
       accentClass: 'border-violet-500/20',
       color: '#a78bfa',
       trend: [10, 12, 18, 22],
@@ -688,8 +708,10 @@ function Dashboard() {
       <SeverityLegend items={severityLegend} />
       <DataSourcesCard items={dataSources} />
       <DetectionEngineStatus
+        analysisCoverage={detectionEngine.analysis_coverage}
+        analyzedFindings={detectionEngine.analyzed_findings}
         modelStatus={detectionEngine.model_status}
-        successRate={detectionEngine.success_rate}
+        pendingFindings={detectionEngine.pending_findings}
       />
     </>
   )

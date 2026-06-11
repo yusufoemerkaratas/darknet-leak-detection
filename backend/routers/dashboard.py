@@ -609,7 +609,9 @@ def _empty_dashboard_overview(
         ],
         detection_engine=DashboardDetectionEngineOut(
             model_status="Preview",
-            success_rate=96.4,
+            analysis_coverage=83.3,
+            analyzed_findings=5,
+            pending_findings=1,
         ),
         sidebar_status_cards=[
             DashboardStatusCardOut(
@@ -637,7 +639,8 @@ def _empty_dashboard_overview(
                         tone="text-amber-300",
                     ),
                     DashboardStatusRowOut(label="Data Sources", value="4"),
-                    DashboardStatusRowOut(label="Success Rate", value="96.4%"),
+                    DashboardStatusRowOut(label="Analyzed Records", value="5 / 6"),
+                    DashboardStatusRowOut(label="Analysis Coverage", value="83.3%"),
                     DashboardStatusRowOut(label="Last Scan", value="Preview mode"),
                 ],
             ),
@@ -663,7 +666,6 @@ def _apply_review_status(record: LeakRecord, status: str) -> None:
 
     record.is_reviewed = status != "Not Reviewed"
     record.is_false_positive = status == "False Positive"
-    record.is_analyzed = status != "Not Reviewed"
 
 
 @router.get("/overview", response_model=DashboardOverviewOut)
@@ -691,6 +693,12 @@ def dashboard_overview(
         )
 
         total_findings = db.query(func.count(LeakRecord.id)).scalar() or 0
+        analyzed_findings = (
+            db.query(func.count(LeakRecord.id))
+            .filter(LeakRecord.is_analyzed.is_(True))
+            .scalar()
+            or 0
+        )
         reviewed_findings = (
             db.query(func.count(LeakRecord.id))
             .filter(LeakRecord.is_reviewed.is_(True))
@@ -797,7 +805,12 @@ def dashboard_overview(
             reference_now=now,
         )
 
-        success_rate = round((reviewed_findings / total_findings) * 100, 1) if total_findings else 0.0
+        pending_findings = max(total_findings - analyzed_findings, 0)
+        analysis_coverage = (
+            round((analyzed_findings / total_findings) * 100, 1) if total_findings else 0.0
+        )
+        if pending_findings > 0 and analysis_coverage >= 100.0:
+            analysis_coverage = 99.9
         latest_collection_label = _format_compact_date(latest_collection_dt) or "No scans yet"
 
         sidebar_status_cards = [
@@ -834,8 +847,12 @@ def dashboard_overview(
                         value=str(active_sources),
                     ),
                     DashboardStatusRowOut(
-                        label="Success Rate",
-                        value=f"{success_rate:.1f}%",
+                        label="Analyzed Records",
+                        value=f"{analyzed_findings:,} / {total_findings:,}",
+                    ),
+                    DashboardStatusRowOut(
+                        label="Analysis Coverage",
+                        value=f"{analysis_coverage:.1f}%",
                     ),
                     DashboardStatusRowOut(
                         label="Last Scan",
@@ -864,7 +881,9 @@ def dashboard_overview(
             top_companies=top_companies,
             detection_engine=DashboardDetectionEngineOut(
                 model_status="Active",
-                success_rate=success_rate,
+                analysis_coverage=analysis_coverage,
+                analyzed_findings=analyzed_findings,
+                pending_findings=pending_findings,
             ),
             sidebar_status_cards=sidebar_status_cards,
         )

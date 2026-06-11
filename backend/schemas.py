@@ -120,7 +120,9 @@ class DashboardStatusCardOut(BaseModel):
 
 class DashboardDetectionEngineOut(BaseModel):
     model_status: str
-    success_rate: float
+    analysis_coverage: float
+    analyzed_findings: int
+    pending_findings: int
 
 
 class DashboardFindingStatusUpdateIn(BaseModel):
