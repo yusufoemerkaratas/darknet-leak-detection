@@ -167,23 +167,35 @@ def check_db_for_jobs():
                 db.commit()
                 continue
                 
-            forum_cfg = forums_by_id.get(source.name)
-            if not forum_cfg:
-                logger.error(f"Source {source.name} not configured in forums.yaml")
-                cj.status = "failed"
-                db.commit()
-                continue
+            collector = None
+            if source.name == "ransomwatch":
+                logger.info(f"Picked up manual/stuck job {cj.id} for source {source.name}")
+                collector = RansomwatchCollector()
+            elif source.name == "paste_sites":
+                logger.info(f"Picked up manual/stuck job {cj.id} for source {source.name}")
+                collector = PasteCollector()
+            elif source.name == "ransomware_sites":
+                logger.info(f"Picked up manual/stuck job {cj.id} for source {source.name}")
+                collector = RansomwareCollector()
+            else:
+                forum_cfg = forums_by_id.get(source.name)
+                if not forum_cfg:
+                    logger.error(f"Source {source.name} not configured in forums.yaml")
+                    cj.status = "failed"
+                    db.commit()
+                    continue
+                logger.info(f"Picked up manual/stuck job {cj.id} for source {source.name}")
+                collector = _make_collector(forum_cfg, defaults)
 
-            logger.info(f"Picked up manual crawl job {cj.id} for source {source.name}")
-            collector = _make_collector(forum_cfg, defaults)
             try:
                 collector.run()
                 cj.status = "completed"
             except Exception as e:
-                logger.error(f"[{forum_cfg['id']}] API triggered collector error: {e}")
+                logger.error(f"[{source.name}] API triggered collector error: {e}")
                 cj.status = "failed"
             finally:
-                collector.close()
+                if hasattr(collector, "close") and callable(collector.close):
+                    collector.close()
                 cj.finished_at = datetime.now(timezone.utc)
                 db.commit()
                 

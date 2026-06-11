@@ -76,7 +76,8 @@ services:
       TOR_SOCKS_PORT: 9050
       TOR_CONTROL_PORT: 9051
       TOR_CONTROL_PASSWORD: datenleck2024
-      OLLAMA_URL: http://host-gateway:11434
+      # SSH tunnel command for OLLAMA_URL: see collectors/.env (-g flag required)
+      OLLAMA_URL: http://host-gateway:9999
     env_file:
       - .env
     volumes:
