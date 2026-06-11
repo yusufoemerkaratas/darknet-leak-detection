@@ -2,7 +2,7 @@
 #
 # CAPTCHA solver — supported types:
 #   1. TEXT   : Classic character based CAPTCHA
-#               → Ollama Vision (llava) → Tesseract OCR fallback
+#               → Ollama Vision (qwen3-vl:32b) → Tesseract OCR fallback
 #   2. GRID   : Image matching ("Select cars", "click on traffic lights")
 #               → Ollama Vision: send grid image + instruction together,
 #                 get which cell indices should be selected
@@ -31,7 +31,7 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env")
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_API_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434") + "/api/generate"
+OLLAMA_API_URL = os.environ.get("OLLAMA_URL", "http://localhost:9999") + "/api/generate"
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +205,7 @@ _MATH_PATTERN = re.compile(
 def solve_math(
     expression: str,
     image_bytes: Optional[bytes] = None,
-    model: str = "llava",
+    model: str = "qwen3-vl:32b",
     timeout: int = 30,
 ) -> Optional[str]:
     """
@@ -291,7 +291,7 @@ class CaptchaSolver:
       - SLIDER : solve_slider(background_bytes, slider_piece_bytes=None)
 
     Usage:
-        solver = CaptchaSolver(ollama_model="llava:34b")
+        solver = CaptchaSolver(ollama_model="qwen3-vl:32b")
         # Text CAPTCHA
         text = solver.solve(image_bytes, CaptchaType.TEXT)
         # Grid CAPTCHA
@@ -304,7 +304,7 @@ class CaptchaSolver:
 
     def __init__(
         self,
-        ollama_model: str = "llava",
+        ollama_model: str = "qwen3-vl:32b",
         ollama_timeout: int = 60,
         ollama_url: str = OLLAMA_API_URL,
     ):

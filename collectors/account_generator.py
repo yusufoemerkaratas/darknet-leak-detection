@@ -223,7 +223,7 @@ class AccountRegistrar:
         if captcha_type == "none":
             return {}
 
-        ollama_model = captcha_cfg.get("ollama_model", "llava")
+        ollama_model = captcha_cfg.get("ollama_model", "qwen3-vl:32b")
         solver = CaptchaSolver(ollama_model=ollama_model)
         field_name = captcha_cfg.get("field_name", "captcha")
 
