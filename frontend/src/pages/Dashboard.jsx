@@ -17,6 +17,7 @@ import LiveMonitoringFeed from '../components/dashboard/LiveMonitoringFeed'
 import RecentFindings from '../components/dashboard/RecentFindings'
 import ReportModal from '../components/dashboard/ReportModal'
 import SeverityLegend from '../components/dashboard/SeverityLegend'
+import SourceManagementPanel from '../components/dashboard/SourceManagementPanel'
 import TimelineRangeSelector from '../components/dashboard/TimelineRangeSelector'
 import StatusCard from '../components/cards/StatusCard'
 import DashboardShell from '../components/layout/DashboardShell'
@@ -819,6 +820,8 @@ function Dashboard() {
         totalResults={sortedFindings.length}
         totalPages={totalPages}
       />
+
+      <SourceManagementPanel />
 
       <section className="grid gap-3 xl:grid-cols-3" id="visualizations">
         <StatusCard
