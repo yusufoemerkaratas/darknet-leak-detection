@@ -1,7 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload
 
 from db import SessionLocal
 from models import Alert, AnalysisResult, Company, LeakRecord
@@ -19,24 +21,15 @@ def get_db():
         db.close()
 
 
-def _serialize_alert(alert: Alert, db: Session) -> dict:
-    finding = (
-        db.query(LeakRecord)
-        .filter(LeakRecord.id == alert.leak_record_id)
-        .first()
-    )
-
-    company = (
-        db.query(Company)
-        .filter(Company.id == alert.company_id)
-        .first()
-    )
-
+def _serialize_alert(alert: Alert) -> dict:
     return {
         "id": alert.id,
-        "finding_title": finding.title if finding else None,
+        "leak_record_id": alert.leak_record_id,
+        "company_id": alert.company_id,
+        "finding_title": alert.leak_record.title if alert.leak_record else None,
         "severity": alert.severity,
-        "company": company.name if company else None,
+        "company": alert.company.name if alert.company else None,
+        "is_reviewed": alert.is_reviewed,
         "created_at": alert.created_at,
     }
 
@@ -67,10 +60,13 @@ def _query_alerts(
     page: int,
     size: int,
 ) -> dict:
-    query = db.query(Alert)
+    query = db.query(Alert).options(
+        joinedload(Alert.leak_record),
+        joinedload(Alert.company),
+    )
 
     if severity:
-        query = query.filter(Alert.severity == severity)
+        query = query.filter(func.lower(Alert.severity) == severity.lower())
 
     if company_id:
         query = query.filter(Alert.company_id == company_id)
@@ -97,7 +93,117 @@ def _query_alerts(
         "page": page,
         "size": size,
         "total": total,
-        "items": [_serialize_alert(alert, db) for alert in alerts],
+        "items": [_serialize_alert(alert) for alert in alerts],
+    }
+
+
+def _findings_by_severity(db: Session) -> dict:
+    critical = (
+        db.query(LeakRecord)
+        .filter(LeakRecord.risk_score >= 90)
+        .count()
+    )
+
+    medium = (
+        db.query(LeakRecord)
+        .filter(
+            LeakRecord.risk_score >= 75,
+            LeakRecord.risk_score <= 89,
+        )
+        .count()
+    )
+
+    low = (
+        db.query(LeakRecord)
+        .filter(
+            LeakRecord.risk_score >= 60,
+            LeakRecord.risk_score <= 74,
+        )
+        .count()
+    )
+
+    return {
+        "critical": critical,
+        "medium": medium,
+        "low": low,
+    }
+
+
+def _stats_overview(db: Session) -> dict:
+    total_findings = db.query(func.count(LeakRecord.id)).scalar() or 0
+    total_alerts = db.query(func.count(Alert.id)).scalar() or 0
+    reviewed_findings = (
+        db.query(func.count(LeakRecord.id))
+        .filter(LeakRecord.is_reviewed.is_(True))
+        .scalar()
+        or 0
+    )
+    false_positive_findings = (
+        db.query(func.count(LeakRecord.id))
+        .filter(LeakRecord.is_false_positive.is_(True))
+        .scalar()
+        or 0
+    )
+    monitored_companies = db.query(func.count(Company.id)).scalar() or 0
+    latest_finding_at = db.query(func.max(LeakRecord.collected_at)).scalar()
+    latest_alert_at = db.query(func.max(Alert.created_at)).scalar()
+
+    return {
+        "total_findings": total_findings,
+        "total_alerts": total_alerts,
+        "critical_alerts": (
+            db.query(func.count(Alert.id))
+            .filter(func.lower(Alert.severity).in_(["critical", "high"]))
+            .scalar()
+            or 0
+        ),
+        "open_alerts": (
+            db.query(func.count(Alert.id))
+            .filter(Alert.is_reviewed.is_(False))
+            .scalar()
+            or 0
+        ),
+        "reviewed_findings": reviewed_findings,
+        "false_positive_findings": false_positive_findings,
+        "monitored_companies": monitored_companies,
+        "latest_finding_at": latest_finding_at,
+        "latest_alert_at": latest_alert_at,
+    }
+
+
+def _findings_by_day(db: Session, days: int) -> list[dict]:
+    start_at = datetime.now(timezone.utc) - timedelta(days=days)
+
+    rows = (
+        db.query(
+            func.date(LeakRecord.collected_at).label("date"),
+            func.count(LeakRecord.id).label("findings"),
+        )
+        .filter(LeakRecord.collected_at >= start_at)
+        .group_by(func.date(LeakRecord.collected_at))
+        .order_by(func.date(LeakRecord.collected_at).asc())
+        .all()
+    )
+
+    return [
+        {
+            "date": str(row.date),
+            "findings": row.findings,
+        }
+        for row in rows
+    ]
+
+
+def _alerts_by_severity(db: Session) -> dict:
+    rows = (
+        db.query(Alert.severity, func.count(Alert.id))
+        .group_by(Alert.severity)
+        .all()
+    )
+
+    return {
+        (severity or "unknown"): count
+        for severity, count in rows
     }
 
 
@@ -105,6 +211,7 @@ def _query_alerts(
 def list_findings(
     company_id: int | None = None,
     classification: str | None = None,
+    severity: str | None = None,
     min_score: int | None = None,
     is_reviewed: bool | None = None,
     date_from: datetime | None = None,
@@ -116,7 +223,7 @@ def list_findings(
     db: Session = Depends(get_db),
 ):
 
-    query = db.query(LeakRecord)
+    query = db.query(LeakRecord).options(joinedload(LeakRecord.company))
 
     if company_id:
         query = query.filter(LeakRecord.company_id == company_id)
@@ -125,6 +232,9 @@ def list_findings(
         query = query.filter(
             LeakRecord.classification == classification
         )
+
+    if severity:
+        query = query.filter(func.lower(LeakRecord.severity) == severity.lower())
 
     if min_score is not None:
         query = query.filter(
@@ -158,18 +268,16 @@ def list_findings(
 
     for finding in findings:
 
-        company = (
-            db.query(Company)
-            .filter(Company.id == finding.company_id)
-            .first()
-        )
-
         result.append({
             "id": finding.id,
             "title": finding.title,
-            "company": company.name if company else None,
+            "company_id": finding.company_id,
+            "company": finding.company.name if finding.company else None,
             "classification": finding.classification,
+            "severity": finding.severity,
             "risk_score": finding.risk_score,
+            "is_reviewed": finding.is_reviewed,
+            "is_false_positive": finding.is_false_positive,
             "created_at": finding.collected_at,
         })
 
@@ -225,6 +333,28 @@ def list_alerts_root(
         page=page,
         size=size,
     )
+
+
+@stats_router.get("/stats/overview")
+def stats_overview(
+    db: Session = Depends(get_db),
+):
+    return _stats_overview(db)
+
+
+@stats_router.get("/stats/findings-by-day")
+def findings_by_day(
+    days: int = Query(default=30, ge=1, le=365),
+    db: Session = Depends(get_db),
+):
+    return _findings_by_day(db, days)
+
+
+@stats_router.get("/stats/alerts-by-severity")
+def alerts_by_severity(
+    db: Session = Depends(get_db),
+):
+    return _alerts_by_severity(db)
 
 
 @router.get("/{finding_id}")
@@ -333,35 +463,3 @@ def findings_by_severity_root(
     db: Session = Depends(get_db),
 ):
     return _findings_by_severity(db)
-
-
-def _findings_by_severity(db: Session) -> dict:
-    critical = (
-        db.query(LeakRecord)
-        .filter(LeakRecord.risk_score >= 90)
-        .count()
-    )
-
-    medium = (
-        db.query(LeakRecord)
-        .filter(
-            LeakRecord.risk_score >= 75,
-            LeakRecord.risk_score <= 89,
-        )
-        .count()
-    )
-
-    low = (
-        db.query(LeakRecord)
-        .filter(
-            LeakRecord.risk_score >= 60,
-            LeakRecord.risk_score <= 74,
-        )
-        .count()
-    )
-
-    return {
-        "critical": critical,
-        "medium": medium,
-        "low": low,
-    }

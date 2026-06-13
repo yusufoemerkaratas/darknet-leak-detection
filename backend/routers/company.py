@@ -16,6 +16,7 @@ def get_db():
 def create(company: schemas.CompanyCreate, db: Session = Depends(get_db)):
     return crud.create_company(db, company)
 
+@router.get("", response_model=list[schemas.CompanyOut])
 @router.get("/", response_model=list[schemas.CompanyOut])
 def list_companies(db: Session = Depends(get_db)):
     return crud.get_companies(db)

@@ -55,6 +55,24 @@ function mapFindingDetail(finding) {
   }
 }
 
+function normalizeSeverityLabel(label) {
+  if (!label) return 'Info'
+
+  const normalized = String(label).toLowerCase()
+  if (normalized === 'critical') return 'Critical'
+  if (normalized === 'high') return 'High'
+  if (normalized === 'medium') return 'Medium'
+  if (normalized === 'low') return 'Low'
+  return 'Info'
+}
+
+function mapSeverityBreakdown(breakdown) {
+  return Object.entries(breakdown ?? {}).map(([label, value]) => ({
+    label: normalizeSeverityLabel(label),
+    value,
+  }))
+}
+
 export async function getDashboardOverview(timelineRange = '7d') {
   const query = new URLSearchParams({ timeline_range: timelineRange }).toString()
   const data = await get(`/dashboard/overview?${query}`)
@@ -64,6 +82,25 @@ export async function getDashboardOverview(timelineRange = '7d') {
     findings: (data.findings ?? []).map(mapFinding),
     critical_alerts: (data.critical_alerts ?? []).map(mapFinding),
   }
+}
+
+export async function getDashboardBackendStats(days = 30) {
+  const query = new URLSearchParams({ days: String(days) }).toString()
+  const [overview, findingsByDay, alertsBySeverity] = await Promise.all([
+    get('/stats/overview'),
+    get(`/stats/findings-by-day?${query}`),
+    get('/stats/alerts-by-severity'),
+  ])
+
+  return {
+    overview,
+    findingsByDay,
+    alertsBySeverity: mapSeverityBreakdown(alertsBySeverity),
+  }
+}
+
+export async function getCompanies() {
+  return get('/companies')
 }
 
 export async function getFindingDetail(findingId) {
