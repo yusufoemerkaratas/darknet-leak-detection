@@ -8,6 +8,11 @@ class SourceCreate(BaseModel):
     name: str
     url: str
 
+class SourceUpdate(BaseModel):
+    name: Optional[str] = None
+    url: Optional[str] = None
+    is_active: Optional[bool] = None
+
 class SourceOut(BaseModel):
     id: int
     name: str
@@ -16,6 +21,47 @@ class SourceOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class SourceHealthOut(BaseModel):
+    source_id: int
+    status: str
+    total_jobs: int
+    successful_jobs: int
+    failed_jobs: int
+    running_jobs: int
+    success_rate: float
+    average_latency_seconds: Optional[float] = None
+    last_run_at: Optional[datetime] = None
+    last_success_at: Optional[datetime] = None
+    last_error_at: Optional[datetime] = None
+
+class SourceMetricPointOut(BaseModel):
+    job_id: int
+    status: str
+    total_records: int
+    inserted_records: int
+    duplicate_records: int
+    latency_seconds: Optional[float] = None
+    started_at: datetime
+    finished_at: Optional[datetime] = None
+
+class SourceMetricsOut(BaseModel):
+    source_id: int
+    total_jobs: int
+    total_records: int
+    inserted_records: int
+    duplicate_records: int
+    recent_jobs: list[SourceMetricPointOut]
+
+class SourceTestCrawlOut(BaseModel):
+    job_id: int
+    source_id: int
+    status: str
+    message: str
+    total_records: int
+    inserted_records: int
+    duplicate_records: int
+    started_at: datetime
 
 class CompanyCreate(BaseModel):
     name: str
