@@ -240,6 +240,11 @@ forums:
     account_generation:
       enabled: true
       captcha: image  # Trigger Ollama LLaVA
+    selectors:
+      post_item: ".flash"
+      title: "h2"
+      body: "#content"
+      next_page: ""
 
   - id: cracked_io
     name: "Cracked.io"
