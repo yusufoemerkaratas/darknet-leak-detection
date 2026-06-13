@@ -10,13 +10,21 @@ def create_source(db, source):
     db.refresh(db_source)
     return db_source
 
-def get_sources(db):
-    return db.query(Source).all()
+def get_sources(db, name=None, is_active=None):
+    query = db.query(Source)
+
+    if name:
+        query = query.filter(Source.name.ilike(f"%{name}%"))
+
+    if is_active is not None:
+        query = query.filter(Source.is_active.is_(is_active))
+
+    return query.order_by(Source.name.asc()).all()
 
 def update_source(db, source_id, source):
     db_source = db.query(Source).filter(Source.id == source_id).first()
     if not db_source:
-        return {"error": "not found"}
+        return None
 
     db_source.name = source.name
     db_source.url = source.url
@@ -24,10 +32,23 @@ def update_source(db, source_id, source):
     db.refresh(db_source)
     return db_source
 
+def patch_source(db, source_id, source):
+    db_source = db.query(Source).filter(Source.id == source_id).first()
+    if not db_source:
+        return None
+
+    update_data = source.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_source, field, value)
+
+    db.commit()
+    db.refresh(db_source)
+    return db_source
+
 def toggle_source(db, source_id):
     db_source = db.query(Source).filter(Source.id == source_id).first()
     if not db_source:
-        return {"error": "not found"}
+        return None
 
     db_source.is_active = not db_source.is_active
     db.commit()
