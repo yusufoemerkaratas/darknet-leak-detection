@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -8,7 +9,10 @@ from analysis.classifier import FindingClassifier
 from analysis.detectors.company_detector import CompanyDetector
 from analysis.detectors.credential_detector import CredentialDetector
 from analysis.detectors.terminology_detector import TerminologyDetector
+from analysis.llm_enrichment import LLMEnrichmentService
 from analysis.scorer import RiskScorer
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -21,6 +25,7 @@ class AnalysisEngineResult:
     matched_companies: List[Dict[str, Any]] = field(default_factory=list)
     score_breakdown: Dict[str, Any] = field(default_factory=dict)
     signal_flags: Dict[str, Any] = field(default_factory=dict)
+    llm_enrichment: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def best_company_name(self) -> Optional[str]:
@@ -43,17 +48,23 @@ class AnalysisEngineResult:
             "score_breakdown": self.score_breakdown,
             "signal_flags": self.signal_flags,
             "best_company_name": self.best_company_name,
+            "llm_enrichment": self.llm_enrichment,
         }
 
 
 class AnalysisEngine:
-    def __init__(self, company_profile_path: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        company_profile_path: Optional[str] = None,
+        llm_enricher: Optional[Any] = None,
+    ) -> None:
         self._credential_detector = CredentialDetector()
         self._terminology_detector = TerminologyDetector()
         profiles = self._load_company_profiles(company_profile_path)
         self._company_detector = CompanyDetector(profiles)
         self._scorer = RiskScorer()
         self._classifier = FindingClassifier()
+        self._llm_enricher = llm_enricher or LLMEnrichmentService()
 
     def analyze(self, text: str) -> AnalysisEngineResult:
         credential_results = self._credential_detector.detect(text)
@@ -67,7 +78,7 @@ class AnalysisEngine:
         score = self._scorer.score(patterns, terminology, companies)
         classification = self._classifier.classify(score.risk_score, score.signal_flags)
 
-        return AnalysisEngineResult(
+        result = AnalysisEngineResult(
             risk_score=score.risk_score,
             classification=classification.classification,
             classification_rule=classification.classification_rule,
@@ -77,6 +88,18 @@ class AnalysisEngine:
             score_breakdown=score.score_breakdown,
             signal_flags=score.signal_flags,
         )
+
+        try:
+            result.llm_enrichment = self._llm_enricher.enrich(text, result.as_dict())
+        except Exception as exc:
+            logger.warning("LLM enrichment failed unexpectedly: %s", exc)
+            result.llm_enrichment = {
+                "status": "error",
+                "explanation": None,
+                "error": str(exc),
+            }
+
+        return result
 
     @staticmethod
     def _load_company_profiles(company_profile_path: Optional[str]) -> List[Dict[str, Any]]:

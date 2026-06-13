@@ -194,6 +194,7 @@ def process_file(db, filepath: Path) -> bool:
         # Combine pattern detection with parser metadata
         detected = {
             "patterns": analysis.detected_patterns,
+            "llm_enrichment": analysis.llm_enrichment,
             "parser": {
                 "language":      parsed.language,
                 "is_code":       parsed.is_code,
