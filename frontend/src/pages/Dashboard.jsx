@@ -21,6 +21,8 @@ import TimelineRangeSelector from '../components/dashboard/TimelineRangeSelector
 import StatusCard from '../components/cards/StatusCard'
 import DashboardShell from '../components/layout/DashboardShell'
 import {
+  getCompanies,
+  getDashboardBackendStats,
   getDashboardOverview,
   getFindingDetail,
   updateFindingStatus,
@@ -33,6 +35,11 @@ const TIMELINE_RANGE_LABELS = {
   '7d': 'last 7 days',
   '30d': 'last 30 days',
   '365d': 'last 12 months',
+}
+const TIMELINE_RANGE_DAYS = {
+  '7d': 7,
+  '30d': 30,
+  '365d': 365,
 }
 
 function normalizeSearchTerm(value) {
@@ -162,6 +169,35 @@ function aggregateCompanies(findings) {
       return right.score - left.score
     })
     .slice(0, 5)
+}
+
+function mergeBackendStats(dashboardOverview, backendStats, companies) {
+  const summary = dashboardOverview.summary ?? {}
+  const statsOverview = backendStats.overview ?? {}
+  const companyOptions = (companies ?? [])
+    .map((company) => company.name)
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right))
+
+  return {
+    ...dashboardOverview,
+    alert_severity_breakdown: backendStats.alertsBySeverity ?? [],
+    company_options: companyOptions,
+    summary: {
+      ...summary,
+      total_findings: statsOverview.total_findings ?? summary.total_findings ?? 0,
+      critical_alerts: statsOverview.critical_alerts ?? summary.critical_alerts ?? 0,
+      reviewed_findings: statsOverview.reviewed_findings ?? summary.reviewed_findings ?? 0,
+      monitored_companies:
+        statsOverview.monitored_companies ?? summary.monitored_companies ?? companyOptions.length,
+      latest_collection:
+        statsOverview.latest_finding_at ?? summary.latest_collection ?? 'No scan data',
+    },
+    timeline:
+      backendStats.findingsByDay?.length > 0
+        ? backendStats.findingsByDay
+        : dashboardOverview.timeline,
+  }
 }
 
 function escapeHtml(value) {
@@ -323,11 +359,15 @@ function Dashboard() {
       setLoadError('')
 
       try {
-        const data = await getDashboardOverview(timelineRange)
+        const [overview, backendStats, companies] = await Promise.all([
+          getDashboardOverview(timelineRange),
+          getDashboardBackendStats(TIMELINE_RANGE_DAYS[timelineRange] ?? 30),
+          getCompanies(),
+        ])
         if (!isActive) return
 
         startTransition(() => {
-          setDashboardData(data)
+          setDashboardData(mergeBackendStats(overview, backendStats, companies))
         })
       } catch (error) {
         if (!isActive) return
@@ -413,7 +453,10 @@ function Dashboard() {
     severityFilter !== 'All Severity' ||
     statusFilter !== 'All Status'
 
-  const companyOptions = [...new Set(findings.map((finding) => finding.company))]
+  const companyOptions =
+    dashboardData?.company_options?.length > 0
+      ? dashboardData.company_options
+      : [...new Set(findings.map((finding) => finding.company))]
 
   const filteredFindings = (() => {
     return findings.filter((finding) => {
