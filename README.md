@@ -230,6 +230,10 @@ Copy `.env.example` to `.env` and set the following:
 | `TOR_CONTROL_PASSWORD` | — | Tor control port password |
 | `OLLAMA_URL` | `http://localhost:11434` | OLLAMA API endpoint (host machine) |
 | `OLLAMA_CAPTCHA_MODEL` | `llava` | Vision model for CAPTCHA solving |
+| `LLM_ANALYSIS_ENABLED` | `false` | Enables optional LLM enrichment after deterministic analysis |
+| `LLM_ANALYSIS_URL` | `http://localhost:9999/api/generate` | School LLM endpoint or local SSH tunnel URL |
+| `LLM_ANALYSIS_MODEL` | `llama3.1` | Model name sent to the LLM service |
+| `LLM_ANALYSIS_TIMEOUT` | `30` | LLM request timeout in seconds |
 | `PASTEEE_API_KEY` | — | Paste.ee API key (optional) |
 | `BREACHFORUMS_USER` | — | BreachForums account username |
 | `BREACHFORUMS_PASS` | — | BreachForums account password |
@@ -241,6 +245,29 @@ Copy `.env.example` to `.env` and set the following:
 | `CRACKED_PASS` | — | Cracked.io account password |
 
 > Forum credentials are only used for authenticated scraping. The system can run without them, but authenticated forums will be skipped.
+
+### Optional LLM Analysis Enrichment
+
+The deterministic analysis pipeline remains the source of truth for company matching, credential detection, terminology detection, risk scoring, and classification. If `LLM_ANALYSIS_ENABLED=false`, analysis runs without contacting an LLM.
+
+When enabled, the LLM enrichment runs after deterministic analysis and writes a concise threat explanation into the analysis metadata. LLM failures are logged and do not stop ingestion.
+
+For a private school-hosted LLM, expose the service locally first, for example through an SSH tunnel:
+
+```bash
+ssh -N -L 9999:<school-llm-host>:<school-llm-port> <school-user>@<school-jump-host>
+```
+
+Then configure `.env` with placeholders replaced locally:
+
+```bash
+LLM_ANALYSIS_ENABLED=true
+LLM_ANALYSIS_URL=http://localhost:9999/api/generate
+LLM_ANALYSIS_MODEL=<school-model-name>
+LLM_ANALYSIS_TIMEOUT=30
+```
+
+Do not commit SSH keys, passwords, API tokens, or real private endpoint details.
 
 ---
 
