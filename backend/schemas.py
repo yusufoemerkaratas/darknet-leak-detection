@@ -107,9 +107,18 @@ class DashboardFindingOut(BaseModel):
     affected: str
 
 
+class DashboardLLMExplanationOut(BaseModel):
+    status: str
+    text: Optional[str] = None
+    source: str
+    is_available: bool
+    fallback_reason: Optional[str] = None
+
+
 class DashboardFindingDetailOut(DashboardFindingOut):
     title: str
     summary: str
+    llm_explanation: DashboardLLMExplanationOut
     recommended_action: str
     raw_url: Optional[str] = None
     published_at: Optional[str] = None
