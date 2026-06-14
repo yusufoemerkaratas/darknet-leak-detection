@@ -3,6 +3,26 @@ import { getSeverityTheme, getStatusTheme } from '../../styles/theme'
 
 const statusOptions = ['Not Reviewed', 'Reviewed', 'False Positive', 'Escalated']
 
+const llmStatusLabels = {
+  available: 'LLM Available',
+  disabled: 'LLM Disabled',
+  empty: 'LLM Empty',
+  error: 'LLM Failed',
+  fallback: 'Fallback',
+  skipped: 'LLM Skipped',
+  unavailable: 'LLM Unavailable',
+}
+
+function getLLMStatusTheme(explanation) {
+  if (explanation?.isAvailable) {
+    return 'border-cyan-400/30 bg-cyan-400/10 text-cyan-200'
+  }
+  if (explanation?.status === 'error') {
+    return 'border-rose-400/30 bg-rose-400/10 text-rose-200'
+  }
+  return 'border-amber-400/30 bg-amber-400/10 text-amber-200'
+}
+
 function FindingDetailModal({
   finding,
   isLoading,
@@ -15,6 +35,8 @@ function FindingDetailModal({
 
   const severityTone = finding ? getSeverityTheme(finding.severity) : null
   const statusTone = finding ? getStatusTheme(finding.status) : null
+  const llmExplanation = finding?.llmExplanation
+  const llmStatusLabel = llmStatusLabels[llmExplanation?.status] ?? 'LLM Status'
 
   return (
     <div
@@ -102,8 +124,24 @@ function FindingDetailModal({
                 </div>
 
                 <div className="rounded-[14px] border border-slate-800 bg-slate-950/45 p-3">
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">AI Threat Explanation</p>
-                  <p className="mt-2 text-[12px] leading-6 text-slate-300">{finding.summary}</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">AI Threat Explanation</p>
+                    {llmExplanation ? (
+                      <span
+                        className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${getLLMStatusTheme(llmExplanation)}`}
+                      >
+                        {llmStatusLabel}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-2 text-[12px] leading-6 text-slate-300">
+                    {llmExplanation?.text ?? finding.summary}
+                  </p>
+                  {llmExplanation?.fallbackReason ? (
+                    <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                      {llmExplanation.fallbackReason}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="rounded-[14px] border border-slate-800 bg-slate-950/45 p-3">
