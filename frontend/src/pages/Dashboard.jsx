@@ -774,8 +774,8 @@ function Dashboard() {
     >
       <section className="dashboard-fade flex items-center justify-between gap-3" id="dashboard">
         <div>
-          <h1 className="section-title font-display text-[1.15rem] font-semibold tracking-tight text-white">
-            Home
+          <h1 className="section-title font-display text-[1.3rem] font-semibold tracking-tight text-white">
+            Dashboard
           </h1>
           <p className="mt-0.5 text-[11px] text-slate-400">
             Real-time overview of detected leaks and exposures
@@ -802,7 +802,7 @@ function Dashboard() {
         </StatusCard>
       ) : null}
 
-      <section className="grid grid-cols-2 gap-2 lg:grid-cols-4" id="summary">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" id="summary">
         {statCards.map((card, index) => (
           <StatCard
             accentClass={card.accentClass}
@@ -914,6 +914,17 @@ function Dashboard() {
           <CompaniesBarChart companies={topCompanies} />
         </StatusCard>
       </section>
+
+      <StatusCard
+        id="settings"
+        subtitle="Operational dashboard preferences and integrations will be expanded here."
+        title="Settings"
+      >
+        <div className="rounded-[12px] border border-slate-800/80 bg-slate-950/45 px-3 py-3 text-[12px] text-slate-400">
+          Current dashboard settings use the existing environment configuration and backend
+          health endpoints. No additional frontend settings are required for this fix.
+        </div>
+      </StatusCard>
 
       {isReportOpen ? (
         <ReportModal

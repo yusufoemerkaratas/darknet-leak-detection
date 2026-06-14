@@ -27,7 +27,7 @@ function DashboardShell({
         <div className="grid-fade absolute inset-0 opacity-25" />
       </div>
 
-      <div className="relative mx-auto flex min-h-screen max-w-[1540px] px-3 py-3 xl:px-4 xl:py-4">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-[1720px] px-3 py-3 xl:px-4 xl:py-4">
         <Sidebar
           activeItem={activeItem}
           isOpen={sidebarOpen}
@@ -36,7 +36,7 @@ function DashboardShell({
           statusCards={sidebarStatusCards}
         />
 
-        <div className="flex min-w-0 flex-1 flex-col xl:pl-[194px]">
+        <div className="flex min-w-0 flex-1 flex-col xl:pl-[260px]">
           <Topbar
             onOpenSidebar={() => setSidebarOpen(true)}
             searchValue={searchValue}
@@ -44,7 +44,7 @@ function DashboardShell({
           />
 
           <main className="flex-1 px-1 pb-1 pt-1.5 sm:px-1.5 xl:px-2">
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_244px] 2xl:grid-cols-[minmax(0,1fr)_252px]">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
               <section className="min-w-0 space-y-3">{children}</section>
               <aside className="min-w-0 space-y-3">{rightPanel}</aside>
             </div>

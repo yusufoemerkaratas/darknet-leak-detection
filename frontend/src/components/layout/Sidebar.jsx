@@ -8,6 +8,7 @@ import {
   FileText,
   LayoutDashboard,
   SearchCheck,
+  Settings,
   Shield,
   X,
 } from 'lucide-react'
@@ -21,6 +22,7 @@ const iconMap = {
   sources: Database,
   visualizations: BarChart3,
   reports: FileText,
+  settings: Settings,
   'monitoring-feed': Bell,
   'severity-legend': BarChart3,
   'data-sources-panel': Database,
@@ -43,21 +45,21 @@ function Sidebar({ activeItem, isOpen, onClose, onSelectItem, statusCards = [] }
       />
 
       <aside
-        className={`panel-surface fixed inset-y-3 left-3 z-40 flex w-[186px] flex-col rounded-[14px] px-3 py-3.5 transition duration-300 xl:inset-y-4 xl:left-4 xl:w-[180px] ${
+        className={`panel-surface fixed inset-y-3 left-3 z-40 flex w-[244px] flex-col rounded-[16px] px-4 py-4 transition duration-300 xl:inset-y-4 xl:left-4 xl:w-[240px] ${
           isOpen ? 'translate-x-0' : '-translate-x-[120%] xl:translate-x-0'
         }`}
       >
-        <div className="mb-4 flex items-start justify-between">
+        <div className="mb-5 flex items-start justify-between">
           <div className="flex items-start gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500/25 via-violet-500/20 to-cyan-400/20 soft-ring">
-              <Shield className="h-4.5 w-4.5 text-indigo-300" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/30 via-violet-500/25 to-cyan-400/20 soft-ring">
+              <Shield className="h-5 w-5 text-indigo-200" />
             </div>
 
             <div>
-              <p className="font-display text-[1.25rem] font-semibold tracking-tight text-white">
+              <p className="font-display text-[1.35rem] font-semibold tracking-tight text-white">
                 LeakGuard
               </p>
-              <p className="max-w-[110px] text-[9px] leading-3.5 text-slate-400">
+              <p className="max-w-[150px] text-[10px] leading-4 text-slate-400">
                 AI Basics Leak Detection System
               </p>
             </div>
@@ -79,7 +81,7 @@ function Sidebar({ activeItem, isOpen, onClose, onSelectItem, statusCards = [] }
 
             return (
               <button
-                className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition ${
+                className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left transition ${
                   isActive
                     ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-[0_0_30px_rgba(99,102,241,0.25)]'
                     : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
@@ -89,7 +91,7 @@ function Sidebar({ activeItem, isOpen, onClose, onSelectItem, statusCards = [] }
                 type="button"
               >
                 <Icon className="h-4 w-4" />
-                <span className="text-[11px] font-medium">{item.label}</span>
+                <span className="text-[12px] font-medium">{item.label}</span>
               </button>
             )
           })}
@@ -134,15 +136,40 @@ function Sidebar({ activeItem, isOpen, onClose, onSelectItem, statusCards = [] }
 
         <div className="mt-auto space-y-2 pt-4">
           {liveMonitoringRow ? (
-            <section className="panel-muted rounded-[12px] p-2.5">
+            <section className="panel-muted rounded-[14px] p-3">
               <div className="flex items-center gap-2 text-[10px]">
                 <span className="signal-dot h-2.5 w-2.5 rounded-full bg-emerald-400" />
                 <span className="font-medium uppercase tracking-[0.16em] text-slate-300">
                   Live Monitoring
                 </span>
               </div>
+              <p className="mt-2 text-[11px] leading-4 text-slate-500">
+                All systems operational
+              </p>
             </section>
           ) : null}
+          <section className="panel-muted rounded-[14px] p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                Detection Engine
+              </p>
+              <span className="signal-dot h-2 w-2 rounded-full bg-emerald-400" />
+            </div>
+            <div className="space-y-1.5 text-[11px] text-slate-500">
+              <div className="flex justify-between gap-2">
+                <span>AI Model</span>
+                <span className="text-emerald-300">Active</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span>Data Sources</span>
+                <span className="text-slate-300">Live</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span>Last Scan</span>
+                <span className="text-slate-300">Auto</span>
+              </div>
+            </div>
+          </section>
         </div>
       </aside>
     </>
