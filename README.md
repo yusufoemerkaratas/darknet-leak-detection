@@ -283,6 +283,18 @@ LLM_ANALYSIS_TIMEOUT=60
 
 Do not commit SSH keys, passwords, API tokens, or real private endpoint details.
 
+#### Demo verification for dashboard explanations
+
+Use preview dashboard data when live LLM access is unavailable. The finding detail API still returns a structured `llm_explanation` object with `status`, `text`, `source`, `is_available`, and `fallback_reason`, so the dashboard can show whether the explanation came from an LLM or from the deterministic fallback.
+
+Manual verification flow:
+
+1. Keep `LLM_ANALYSIS_ENABLED=false` and open a finding detail in the dashboard.
+2. Confirm the `AI Threat Explanation` panel shows fallback text and an unavailable/disabled state without breaking the modal.
+3. Enable the LLM locally with placeholder values replaced only in `.env`, then ingest or open a finding that has `llm_enrichment.status=ok`.
+4. Confirm `/api/dashboard/findings/{id}` includes `llm_explanation.is_available=true` and the dashboard labels the explanation as available.
+5. Confirm failed or empty LLM responses never expose API keys, SSH keys, private endpoint URLs, or raw credential values in the UI or logs.
+
 ---
 
 ## Collectors
