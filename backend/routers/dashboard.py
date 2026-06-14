@@ -355,14 +355,32 @@ def _serialize_finding(record: LeakRecord) -> DashboardFindingOut:
     )
 
 
+def _extract_llm_explanation(record: LeakRecord) -> Optional[str]:
+    if not record.analysis_result:
+        return None
+    patterns = record.analysis_result.detected_patterns
+    if not isinstance(patterns, dict):
+        return None
+    enrichment = patterns.get("llm_enrichment")
+    if not isinstance(enrichment, dict):
+        return None
+    explanation = enrichment.get("explanation")
+    if enrichment.get("status") == "ok" and isinstance(explanation, str):
+        return explanation.strip() or None
+    return None
+
+
 def _serialize_finding_detail(record: LeakRecord) -> DashboardFindingDetailOut:
     finding = _serialize_finding(record)
     title = record.title or finding.type
-    summary = _build_threat_explanation(
-        finding.type,
-        finding.source,
-        finding.affected,
-        finding.severity,
+    summary = (
+        _extract_llm_explanation(record)
+        or _build_threat_explanation(
+            finding.type,
+            finding.source,
+            finding.affected,
+            finding.severity,
+        )
     )
 
     return DashboardFindingDetailOut(
