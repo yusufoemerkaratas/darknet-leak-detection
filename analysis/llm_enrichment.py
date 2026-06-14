@@ -18,9 +18,11 @@ def _env_flag(name: str, default: bool = False) -> bool:
 @dataclass(frozen=True)
 class LLMEnrichmentConfig:
     enabled: bool
+    provider: str
     endpoint_url: str
     model: str
     timeout_seconds: int
+    api_key: Optional[str] = None
 
     @classmethod
     def from_env(cls) -> "LLMEnrichmentConfig":
@@ -32,12 +34,14 @@ class LLMEnrichmentConfig:
 
         return cls(
             enabled=_env_flag("LLM_ANALYSIS_ENABLED", False),
+            provider=os.environ.get("LLM_ANALYSIS_PROVIDER", "ollama").strip().lower(),
             endpoint_url=os.environ.get(
                 "LLM_ANALYSIS_URL",
                 "http://localhost:9999/api/generate",
             ),
             model=os.environ.get("LLM_ANALYSIS_MODEL", "llama3.1"),
             timeout_seconds=max(timeout, 1),
+            api_key=os.environ.get("LLM_ANALYSIS_API_KEY"),
         )
 
 
@@ -62,16 +66,14 @@ class LLMEnrichmentService:
             return {"status": "skipped", "reason": "classification_irrelevant"}
 
         prompt = _build_prompt(text, analysis)
-        payload = {
-            "model": self.config.model,
-            "prompt": prompt,
-            "stream": False,
-        }
+        payload = self._build_payload(prompt)
+        headers = self._build_headers()
 
         try:
             response = self._session.post(
                 self.config.endpoint_url,
                 json=payload,
+                headers=headers,
                 timeout=self.config.timeout_seconds,
             )
             response.raise_for_status()
@@ -86,6 +88,38 @@ class LLMEnrichmentService:
         except Exception as exc:
             logger.warning("LLM enrichment failed: %s", exc)
             return {"status": "error", "explanation": None, "error": str(exc)}
+
+    def _build_payload(self, prompt: str) -> Dict[str, Any]:
+        if self.config.provider in {"github-models", "openai-compatible"}:
+            return {
+                "model": self.config.model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You generate concise data leak threat explanations.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+            }
+
+        return {
+            "model": self.config.model,
+            "prompt": prompt,
+            "stream": False,
+        }
+
+    def _build_headers(self) -> Optional[Dict[str, str]]:
+        if self.config.provider not in {"github-models", "openai-compatible"}:
+            return None
+
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+        }
+        if self.config.api_key:
+            headers["Authorization"] = f"Bearer {self.config.api_key}"
+        return headers
 
 
 def _build_prompt(text: str, analysis: Dict[str, Any]) -> str:

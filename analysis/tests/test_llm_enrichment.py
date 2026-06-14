@@ -5,16 +5,20 @@ from analysis.llm_enrichment import LLMEnrichmentConfig, LLMEnrichmentService
 
 def test_llm_config_reads_environment(monkeypatch):
     monkeypatch.setenv("LLM_ANALYSIS_ENABLED", "true")
+    monkeypatch.setenv("LLM_ANALYSIS_PROVIDER", "github-models")
     monkeypatch.setenv("LLM_ANALYSIS_URL", "http://localhost:9999/api/generate")
     monkeypatch.setenv("LLM_ANALYSIS_MODEL", "school-model")
     monkeypatch.setenv("LLM_ANALYSIS_TIMEOUT", "12")
+    monkeypatch.setenv("LLM_ANALYSIS_API_KEY", "test-token")
 
     config = LLMEnrichmentConfig.from_env()
 
     assert config.enabled is True
+    assert config.provider == "github-models"
     assert config.endpoint_url == "http://localhost:9999/api/generate"
     assert config.model == "school-model"
     assert config.timeout_seconds == 12
+    assert config.api_key == "test-token"
 
 
 def test_llm_service_disabled_does_not_call_session():
@@ -22,6 +26,7 @@ def test_llm_service_disabled_does_not_call_session():
     service = LLMEnrichmentService(
         config=LLMEnrichmentConfig(
             enabled=False,
+            provider="ollama",
             endpoint_url="http://localhost:9999/api/generate",
             model="school-model",
             timeout_seconds=30,
@@ -40,6 +45,7 @@ def test_llm_service_skips_irrelevant_findings():
     service = LLMEnrichmentService(
         config=LLMEnrichmentConfig(
             enabled=True,
+            provider="ollama",
             endpoint_url="http://localhost:9999/api/generate",
             model="school-model",
             timeout_seconds=30,
@@ -59,6 +65,7 @@ def test_llm_service_returns_concise_explanation():
     service = LLMEnrichmentService(
         config=LLMEnrichmentConfig(
             enabled=True,
+            provider="ollama",
             endpoint_url="http://localhost:9999/api/generate",
             model="school-model",
             timeout_seconds=30,
@@ -72,13 +79,54 @@ def test_llm_service_returns_concise_explanation():
     assert result["model"] == "school-model"
     assert result["explanation"] == "Potential credential exposure. Investigate quickly."
     assert session.payload["model"] == "school-model"
+    assert session.payload["stream"] is False
+    assert session.headers is None
     assert session.timeout == 30
+
+
+def test_github_models_service_uses_chat_completion_payload():
+    session = FakeSession(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": "Credential exposure may affect customer accounts.",
+                    },
+                },
+            ],
+        }
+    )
+    service = LLMEnrichmentService(
+        config=LLMEnrichmentConfig(
+            enabled=True,
+            provider="github-models",
+            endpoint_url="https://models.github.ai/inference/chat/completions",
+            model="openai/gpt-5",
+            timeout_seconds=60,
+            api_key="test-token",
+        ),
+        session=session,
+    )
+
+    result = service.enrich("leaked credentials", _analysis())
+
+    assert result["status"] == "ok"
+    assert result["model"] == "openai/gpt-5"
+    assert result["explanation"] == "Credential exposure may affect customer accounts."
+    assert session.payload["model"] == "openai/gpt-5"
+    assert "messages" in session.payload
+    assert session.payload["messages"][0]["role"] == "system"
+    assert session.payload["messages"][1]["role"] == "user"
+    assert session.headers["Authorization"] == "Bearer test-token"
+    assert session.headers["Content-Type"] == "application/json"
+    assert session.timeout == 60
 
 
 def test_llm_service_handles_request_failure():
     service = LLMEnrichmentService(
         config=LLMEnrichmentConfig(
             enabled=True,
+            provider="ollama",
             endpoint_url="http://localhost:9999/api/generate",
             model="school-model",
             timeout_seconds=30,
@@ -115,11 +163,13 @@ class FakeSession:
     def __init__(self, payload):
         self._payload = payload
         self.payload = None
+        self.headers = None
         self.timeout = None
 
-    def post(self, url, json, timeout):
+    def post(self, url, json, timeout, headers=None):
         self.url = url
         self.payload = json
+        self.headers = headers
         self.timeout = timeout
         return FakeResponse(self._payload)
 
