@@ -53,3 +53,24 @@ def test_alerts_list_documents_required_filters():
         "page",
         "size",
     }.issubset(parameter_names)
+
+
+def test_dashboard_finding_detail_documents_llm_explanation_state():
+    openapi = app.openapi()
+    schemas = openapi["components"]["schemas"]
+    detail_schema = schemas["DashboardFindingDetailOut"]
+    llm_schema = schemas["DashboardLLMExplanationOut"]
+
+    assert "llm_explanation" in detail_schema["properties"]
+    assert {
+        "status",
+        "text",
+        "source",
+        "is_available",
+        "fallback_reason",
+    }.issubset(llm_schema["properties"])
+    assert {
+        "status",
+        "source",
+        "is_available",
+    }.issubset(set(llm_schema["required"]))

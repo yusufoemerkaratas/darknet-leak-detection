@@ -17,6 +17,7 @@ from schemas import (
     DashboardFeedItemOut,
     DashboardFindingOut,
     DashboardFindingStatusUpdateIn,
+    DashboardLLMExplanationOut,
     DashboardOverviewOut,
     DashboardSeverityLegendOut,
     DashboardSeverityOut,
@@ -81,6 +82,13 @@ PREVIEW_FINDINGS = [
         "affected": "Affected: 312 emails",
         "title": "Credential leak detected in indexed paste",
         "summary": "Credential pairs matching the monitored company domain were detected in a newly indexed paste source.",
+        "llm_explanation": {
+            "status": "available",
+            "text": "The paste contains credential-like pairs for a monitored company domain, which raises the likelihood of active account compromise.",
+            "source": "demo-llm-mock",
+            "is_available": True,
+            "fallback_reason": None,
+        },
         "recommended_action": "Invalidate exposed credentials, force password resets, and review login telemetry for suspicious access attempts.",
         "raw_url": "https://preview.leakguard.local/paste/technova-credential-leak",
         "evidence": [
@@ -355,7 +363,7 @@ def _serialize_finding(record: LeakRecord) -> DashboardFindingOut:
     )
 
 
-def _extract_llm_explanation(record: LeakRecord) -> Optional[str]:
+def _get_llm_enrichment(record: LeakRecord) -> Optional[dict]:
     if not record.analysis_result:
         return None
     patterns = record.analysis_result.detected_patterns
@@ -364,29 +372,69 @@ def _extract_llm_explanation(record: LeakRecord) -> Optional[str]:
     enrichment = patterns.get("llm_enrichment")
     if not isinstance(enrichment, dict):
         return None
+    return enrichment
+
+
+def _build_llm_explanation_state(
+    record: LeakRecord,
+    fallback_text: str,
+) -> DashboardLLMExplanationOut:
+    enrichment = _get_llm_enrichment(record)
+    if not enrichment:
+        return DashboardLLMExplanationOut(
+            status="unavailable",
+            text=fallback_text,
+            source="deterministic-fallback",
+            is_available=False,
+            fallback_reason="No LLM enrichment metadata is stored for this finding.",
+        )
+
+    status = str(enrichment.get("status") or "unavailable").lower()
     explanation = enrichment.get("explanation")
-    if enrichment.get("status") == "ok" and isinstance(explanation, str):
-        return explanation.strip() or None
-    return None
+    if status == "ok" and isinstance(explanation, str) and explanation.strip():
+        return DashboardLLMExplanationOut(
+            status="available",
+            text=explanation.strip(),
+            source="llm",
+            is_available=True,
+            fallback_reason=None,
+        )
+
+    fallback_reasons = {
+        "disabled": "LLM enrichment is disabled; deterministic explanation shown.",
+        "empty": "The LLM response did not contain usable explanation text.",
+        "error": "LLM enrichment failed; deterministic explanation shown.",
+        "skipped": "LLM enrichment skipped this finding; deterministic explanation shown.",
+    }
+    return DashboardLLMExplanationOut(
+        status=status if status in fallback_reasons else "unavailable",
+        text=fallback_text,
+        source="deterministic-fallback",
+        is_available=False,
+        fallback_reason=fallback_reasons.get(
+            status,
+            "LLM explanation is unavailable; deterministic explanation shown.",
+        ),
+    )
 
 
 def _serialize_finding_detail(record: LeakRecord) -> DashboardFindingDetailOut:
     finding = _serialize_finding(record)
     title = record.title or finding.type
-    summary = (
-        _extract_llm_explanation(record)
-        or _build_threat_explanation(
-            finding.type,
-            finding.source,
-            finding.affected,
-            finding.severity,
-        )
+    fallback_summary = _build_threat_explanation(
+        finding.type,
+        finding.source,
+        finding.affected,
+        finding.severity,
     )
+    llm_explanation = _build_llm_explanation_state(record, fallback_summary)
+    summary = llm_explanation.text or fallback_summary
 
     return DashboardFindingDetailOut(
         **finding.model_dump(),
         title=title,
         summary=summary,
+        llm_explanation=llm_explanation,
         recommended_action=_build_recommended_action(finding.type, finding.severity),
         raw_url=record.raw_url,
         published_at=_format_compact_date(record.published_at),
@@ -428,10 +476,23 @@ def _serialize_preview_detail(
 ) -> DashboardFindingDetailOut:
     finding = _serialize_preview_finding(preview_item, now=now)
     detected_at = _preview_detected_at(now or datetime.now(timezone.utc), preview_item)
+    llm_explanation = DashboardLLMExplanationOut(
+        **preview_item.get(
+            "llm_explanation",
+            {
+                "status": "fallback",
+                "text": preview_item["summary"],
+                "source": "preview-deterministic-fallback",
+                "is_available": False,
+                "fallback_reason": "Preview mode is using demo-safe deterministic explanation text.",
+            },
+        )
+    )
     return DashboardFindingDetailOut(
         **finding.model_dump(),
         title=preview_item["title"],
-        summary=preview_item["summary"],
+        summary=llm_explanation.text or preview_item["summary"],
+        llm_explanation=llm_explanation,
         recommended_action=preview_item["recommended_action"],
         raw_url=preview_item["raw_url"],
         published_at=_format_compact_date(detected_at),

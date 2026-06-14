@@ -43,11 +43,32 @@ function mapFinding(finding) {
   }
 }
 
+function mapLLMExplanation(explanation, fallbackSummary) {
+  if (!explanation) {
+    return {
+      status: 'unavailable',
+      text: fallbackSummary,
+      source: 'deterministic-fallback',
+      isAvailable: false,
+      fallbackReason: 'LLM explanation metadata is not available.',
+    }
+  }
+
+  return {
+    status: explanation.status ?? 'unavailable',
+    text: explanation.text ?? fallbackSummary,
+    source: explanation.source ?? 'deterministic-fallback',
+    isAvailable: Boolean(explanation.is_available),
+    fallbackReason: explanation.fallback_reason ?? '',
+  }
+}
+
 function mapFindingDetail(finding) {
   return {
     ...mapFinding(finding),
     title: finding.title,
     summary: finding.summary,
+    llmExplanation: mapLLMExplanation(finding.llm_explanation, finding.summary),
     recommendedAction: finding.recommended_action,
     rawUrl: finding.raw_url,
     publishedAt: finding.published_at,
