@@ -172,10 +172,19 @@ class TorManager:
         for attempt in range(1, max_attempts + 1):
             try:
                 self._do_newnym()
+                
+                # Measure latency during IP fetch
+                start_time = time.time()
                 new_ip = self._current_ip()
+                latency = time.time() - start_time
 
                 if new_ip and new_ip != old_ip:
-                    logger.info(f"✓ Exit node changed: {old_ip} → {new_ip}")
+                    # Latency check: If it takes more than 5 seconds, the node is probably too slow.
+                    if latency > 5.0:
+                        logger.warning(f"Exit node {new_ip} is too slow (latency: {latency:.2f}s). Rotating again...")
+                        continue
+                        
+                    logger.info(f"✓ Exit node changed: {old_ip} → {new_ip} (Latency: {latency:.2f}s)")
                     return True
 
                 logger.warning(
@@ -185,7 +194,7 @@ class TorManager:
             except Exception as e:
                 logger.error(f"✗ Circuit rotation attempt {attempt} failed: {e}")
 
-        logger.warning("Could not guarantee exit node change after all attempts")
+        logger.warning("Could not guarantee a fast, new exit node after all attempts")
         return False
 
     def get_circuit_info(self):
