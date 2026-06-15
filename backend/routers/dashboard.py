@@ -382,11 +382,11 @@ def _build_llm_explanation_state(
     enrichment = _get_llm_enrichment(record)
     if not enrichment:
         return DashboardLLMExplanationOut(
-            status="unavailable",
+            status="fallback",
             text=fallback_text,
             source="deterministic-fallback",
             is_available=False,
-            fallback_reason="No LLM enrichment metadata is stored for this finding.",
+            fallback_reason="No LLM enrichment metadata is stored for this finding; deterministic explanation shown.",
         )
 
     status = str(enrichment.get("status") or "unavailable").lower()
@@ -853,7 +853,7 @@ def dashboard_overview(
             .join(LeakRecord, LeakRecord.company_id == Company.id)
             .group_by(Company.id, Company.name)
             .order_by(func.count(LeakRecord.id).desc(), func.max(LeakRecord.risk_score).desc())
-            .limit(5)
+            .limit(10)
             .all()
         )
         top_companies = [
