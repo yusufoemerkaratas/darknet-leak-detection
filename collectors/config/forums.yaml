@@ -381,6 +381,62 @@ forums:
         - "corporate"
         - "government"
 
+  - id: ramp
+    name: "Ramp"
+    enabled: true
+    base_url: "http://ramp4vydyvqeyxjqub4h2euhve3vj6tzlrtw44jdd4y7fghx5ofj2hqd.onion"
+    clearnet_url: "https://ramp.forum"
+
+    auth:
+      type: form
+      login_url: "/login"
+      login_method: POST
+      fields:
+        login: "${RAMP_USER}"
+        password: "${RAMP_PASS}"
+        csrf_field: "csrf_token"
+      success_indicator: "logout"
+      session_cookie_name: "PHPSESSID"
+      cookie_file: "cookies/ramp.json"
+      session_ttl: 3600
+
+    account_generation:
+      enabled: false
+      credentials_file: "accounts/ramp.json"
+
+    sections:
+      - name: "Leaks"
+        url: "/forum/leaks/"
+        enabled: true
+      - name: "Ransomware"
+        url: "/forum/ransomware/"
+        enabled: true
+
+    selectors:
+      post_list: "li.ipsDataItem"
+      post_item: "li.ipsDataItem"
+      title: "span.ipsType_break a"
+      author: "a[hreflang]"
+      timestamp: "time"
+      timestamp_attr: "datetime"
+      body: "div.ipsType_richText"
+      category: "span.ipsType_light a"
+      next_page: "li.ipsPagination_next a"
+
+    rate_limit:
+      min_delay: 3.0
+      max_delay: 8.0
+      max_requests_per_hour: 80
+      backoff_on_429: 120
+
+    pre_filter:
+      keywords:
+        - "database"
+        - "leak"
+        - "dump"
+        - "ransomware"
+        - "breach"
+
 defaults:
   request_timeout: 30
   max_retries: 3
