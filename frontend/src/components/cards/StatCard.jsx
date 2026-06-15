@@ -19,22 +19,22 @@ function Sparkline({ color, points }) {
 function StatCard({ icon: Icon, label, value, detail, accentClass, color, trend, delay }) {
   return (
     <div
-      className={`panel-surface dashboard-fade rounded-[13px] px-3 py-2.5 ${accentClass}`}
-      style={{ animationDelay: delay }}
+      className={`dashboard-fade rounded-lg-card px-3 py-2.5 ${accentClass}`}
+      style={{ animationDelay: delay, backgroundColor: 'var(--lg-card, #0c1114)' }}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="mb-1.5 flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/5">
+          <div className="mb-1.5 flex h-7 w-7 items-center justify-center rounded-md border border-white/8 bg-white/3">
             <Icon className="h-3.5 w-3.5" style={{ color }} />
           </div>
-          <p className="truncate text-[11px] text-slate-400">{label}</p>
-          <p className="font-display mt-0.5 text-[1.35rem] font-semibold tracking-tight text-white">
+          <p className="truncate text-[11px] text-lg-muted">{label}</p>
+          <p className="font-display mt-0.5 text-[1.35rem] font-semibold tracking-tight text-lg-text">
             {value}
           </p>
-          <p className="truncate text-[10px] text-slate-500">{detail}</p>
+          <p className="truncate text-[10px] text-lg-muted">{detail}</p>
         </div>
 
-        <div className="rounded-md border border-white/5 bg-slate-950/50 px-1 py-0.5">
+        <div className="rounded-md border border-white/5 bg-[rgba(255,255,255,0.02)] px-1 py-0.5">
           <Sparkline color={color} points={trend} />
         </div>
       </div>
