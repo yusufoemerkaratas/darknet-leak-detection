@@ -166,6 +166,10 @@ class AuthenticatedForumCollector:
         # Per-session stats
         self._docs_found = 0
         self._docs_new = 0
+        self._errors_transient = 0
+        self._errors_persistent = 0
+        self._latency_sum = 0.0
+        self._request_count = 0
 
     # ------------------------------------------------------------------
     # Entry point
@@ -186,7 +190,8 @@ class AuthenticatedForumCollector:
 
         if not self.auth.ensure_authenticated():
             logger.error(f"[{self.forum_id}] Cannot authenticate — skipping forum")
-            return {"forum_id": self.forum_id, "error": "auth_failed"}
+            self._errors_persistent += 1
+            return {"forum_id": self.forum_id, "error": "auth_failed", "errors_persistent": self._errors_persistent}
 
         for section in self.forum.get("sections", []):
             if not section.get("enabled", True):
@@ -202,6 +207,9 @@ class AuthenticatedForumCollector:
             "forum_id": self.forum_id,
             "documents_found": self._docs_found,
             "documents_new": self._docs_new,
+            "errors_transient": self._errors_transient,
+            "errors_persistent": self._errors_persistent,
+            "average_latency_ms": (self._latency_sum / self._request_count * 1000) if self._request_count > 0 else 0
         }
 
     def close(self) -> None:
@@ -288,6 +296,7 @@ class AuthenticatedForumCollector:
 
         except Exception as e:
             logger.error(f"[{self.forum_id}] Section error: {e}", exc_info=True)
+            self._errors_persistent += 1
             job["status"] = "error"
             job["error_message"] = str(e)
 
@@ -439,24 +448,34 @@ class AuthenticatedForumCollector:
 
         for attempt in range(max_retries):
             try:
+                req_start = time.time()
                 resp = self.tor.session.get(url, timeout=timeout)
+                req_latency = time.time() - req_start
+                self._latency_sum += req_latency
+                self._request_count += 1
 
                 # Detect redirect to login page (session expired)
                 if self._is_login_redirect(resp):
                     logger.warning(f"[{self.forum_id}] Session expired — re-authenticating")
                     self.auth.invalidate()
                     if not self.auth.ensure_authenticated():
+                        self._errors_persistent += 1
                         return None
                     continue
 
                 if resp.status_code == 429:
+                    self._errors_transient += 1
                     self.limiter.handle_429(retry=attempt)
                     continue
+                
+                if resp.status_code in (403, 404):
+                    self._errors_persistent += 1
 
                 resp.raise_for_status()
                 return resp
 
             except Exception as e:
+                self._errors_transient += 1
                 logger.warning(
                     f"[{self.forum_id}] Request error (attempt {attempt + 1}/{max_retries}): {e}"
                 )
