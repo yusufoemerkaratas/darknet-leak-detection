@@ -8,6 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, joinedload
 
+from analysis.llm_enrichment import LLMEnrichmentService
 from db import get_db
 from models import AnalysisResult, Company, LeakRecord, Source
 from schemas import (
@@ -747,6 +748,59 @@ def _apply_review_status(record: LeakRecord, status: str) -> None:
     record.is_false_positive = status == "False Positive"
 
 
+def _build_llm_analysis_text(record: LeakRecord) -> str:
+    return "\n".join(
+        part
+        for part in [
+            record.title or "",
+            record.raw_content_text or "",
+            record.raw_url or "",
+        ]
+        if part
+    )
+
+
+def _build_llm_analysis_payload(record: LeakRecord) -> dict:
+    return {
+        "classification": record.classification,
+        "risk_score": _compute_risk_score(record),
+        "classification_rule": (
+            record.analysis_result.classification_rule
+            if record.analysis_result and record.analysis_result.classification_rule
+            else _infer_finding_type(record)
+        ),
+        "matched_companies": (
+            record.analysis_result.matched_companies
+            if record.analysis_result and isinstance(record.analysis_result.matched_companies, list)
+            else []
+        ),
+        "detected_patterns": (
+            record.analysis_result.detected_patterns
+            if record.analysis_result and isinstance(record.analysis_result.detected_patterns, dict)
+            else {}
+        ),
+        "terminology_hits": (
+            record.analysis_result.terminology_hits
+            if record.analysis_result and isinstance(record.analysis_result.terminology_hits, list)
+            else []
+        ),
+    }
+
+
+def _run_and_store_llm_analysis(record: LeakRecord) -> None:
+    patterns = _get_detected_patterns(record)
+    enrichment = LLMEnrichmentService().enrich(
+        _build_llm_analysis_text(record),
+        _build_llm_analysis_payload(record),
+    )
+    patterns["llm_enrichment"] = enrichment
+
+    if record.analysis_result:
+        record.analysis_result.detected_patterns = patterns
+    else:
+        record.analysis_result = AnalysisResult(detected_patterns=patterns)
+
+
 @router.get("/overview", response_model=DashboardOverviewOut)
 def dashboard_overview(
     timeline_range: Literal["7d", "30d", "365d"] = Query(default="7d"),
@@ -1026,4 +1080,35 @@ def update_dashboard_finding_status(
         if not preview_item:
             raise HTTPException(status_code=404, detail="Finding not found")
         preview_item["status"] = payload.status
+        return _serialize_preview_detail(preview_item)
+
+
+@router.post("/findings/{finding_id}/llm-analysis", response_model=DashboardFindingDetailOut)
+def analyze_dashboard_finding_with_llm(
+    finding_id: int,
+    db: Session = Depends(get_db),
+):
+    try:
+        record = (
+            db.query(LeakRecord)
+            .options(
+                joinedload(LeakRecord.company),
+                joinedload(LeakRecord.source),
+                joinedload(LeakRecord.analysis_result),
+            )
+            .filter(LeakRecord.id == finding_id)
+            .first()
+        )
+        if not record:
+            raise HTTPException(status_code=404, detail="Finding not found")
+
+        _run_and_store_llm_analysis(record)
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        return _serialize_finding_detail(record)
+    except OperationalError:
+        preview_item = _get_preview_finding_by_id(finding_id)
+        if not preview_item:
+            raise HTTPException(status_code=404, detail="Finding not found")
         return _serialize_preview_detail(preview_item)

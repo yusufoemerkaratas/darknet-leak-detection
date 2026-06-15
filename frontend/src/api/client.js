@@ -134,6 +134,11 @@ export async function updateFindingStatus(findingId, status) {
   return mapFindingDetail(data)
 }
 
+export async function analyzeFindingWithLLM(findingId) {
+  const data = await post(`/dashboard/findings/${findingId}/llm-analysis`)
+  return mapFindingDetail(data)
+}
+
 export async function getSources(filters = {}) {
   const query = new URLSearchParams()
 

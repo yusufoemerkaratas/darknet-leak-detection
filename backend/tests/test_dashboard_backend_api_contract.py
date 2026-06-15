@@ -64,6 +64,7 @@ def test_dashboard_finding_detail_documents_llm_explanation_state():
     llm_schema = schemas["DashboardLLMExplanationOut"]
 
     assert "llm_explanation" in detail_schema["properties"]
+    assert "/dashboard/findings/{finding_id}/llm-analysis" in openapi["paths"]
     assert {
         "status",
         "text",

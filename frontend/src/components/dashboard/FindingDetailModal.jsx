@@ -1,4 +1,4 @@
-import { ExternalLink, X } from 'lucide-react'
+import { ExternalLink, Sparkles, X } from 'lucide-react'
 import { getSeverityTheme, getStatusTheme } from '../../styles/theme'
 
 const statusOptions = ['Not Reviewed', 'Reviewed', 'False Positive', 'Escalated']
@@ -27,8 +27,10 @@ function FindingDetailModal({
   finding,
   isLoading,
   error,
+  isAnalyzingWithLLM,
   isUpdatingStatus,
   onClose,
+  onAnalyzeWithLLM,
   onStatusChange,
 }) {
   if (!finding && !isLoading && !error) return null
@@ -126,13 +128,24 @@ function FindingDetailModal({
                 <div className="rounded-[14px] border border-slate-800 bg-slate-950/45 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">AI Threat Explanation</p>
-                    {llmExplanation ? (
-                      <span
-                        className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${getLLMStatusTheme(llmExplanation)}`}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {llmExplanation ? (
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-medium ${getLLMStatusTheme(llmExplanation)}`}
+                        >
+                          {llmStatusLabel}
+                        </span>
+                      ) : null}
+                      <button
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-2 py-1 text-[10px] font-medium text-cyan-200 transition hover:border-cyan-300/45 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={isAnalyzingWithLLM}
+                        onClick={onAnalyzeWithLLM}
+                        type="button"
                       >
-                        {llmStatusLabel}
-                      </span>
-                    ) : null}
+                        <Sparkles className="h-3.5 w-3.5" />
+                        {isAnalyzingWithLLM ? 'Analyzing...' : 'Analyze with AI'}
+                      </button>
+                    </div>
                   </div>
                   <p className="mt-2 text-[12px] leading-6 text-slate-300">
                     {llmExplanation?.text ?? finding.summary}
