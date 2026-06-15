@@ -16,6 +16,8 @@ defaults:
   auth:
     type: none
   captcha_strategy: none
+  captcha_config:
+    moondream_fallback: true
   rate_limit:
     min_delay: 5.0
     max_delay: 15.0

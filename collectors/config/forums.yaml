@@ -99,6 +99,7 @@ forums:
         ollama_model: "qwen3-vl:32b"           # Model name installed in Ollama
         field_name: "captcha"           # Name of the POST form field
         image_selector: "img.captcha"  # CAPTCHA image on registration page
+        moondream_fallback: true        # Enable Moondream 2 VLM fallback
       credentials_file: "accounts/breachforums.json"
 
     sections:
@@ -182,6 +183,7 @@ forums:
         ollama_model: "qwen3-vl:32b"
         field_name: "captcha_answer"
         expression_selector: ".captcha-math"
+        moondream_fallback: true        # Enable Moondream 2 VLM fallback
       credentials_file: "accounts/xss_forum.json"
 
     sections:
