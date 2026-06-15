@@ -78,12 +78,18 @@ services:
       TOR_CONTROL_PASSWORD: datenleck2024
       # SSH tunnel command for OLLAMA_URL: see collectors/.env (-g flag required)
       OLLAMA_URL: http://host-gateway:9999
+      # Moondream 2 VLM fallback for CAPTCHA solving (local model)
+      MOONDREAM_MODEL: ${MOONDREAM_MODEL:-vikhyatk/moondream2}
+      MOONDREAM_DEVICE: ${MOONDREAM_DEVICE:-cpu}
+      # HuggingFace cache inside container
+      HF_HOME: /app/.cache/huggingface
     env_file:
       - .env
     volumes:
       - collector_raw:/app/collectors/raw_storage
       - collector_processed:/app/collectors/processed_storage
       - collector_failed:/app/collectors/failed_storage
+      - huggingface_cache:/app/.cache/huggingface
     extra_hosts:
       - "host-gateway:host-gateway"
 
@@ -92,3 +98,4 @@ volumes:
   collector_raw:
   collector_processed:
   collector_failed:
+  huggingface_cache:    # Moondream model cache (persisted across restarts)

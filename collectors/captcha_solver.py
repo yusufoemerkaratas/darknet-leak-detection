@@ -2,17 +2,21 @@
 #
 # CAPTCHA solver — supported types:
 #   1. TEXT   : Classic character based CAPTCHA
-#               → Ollama Vision (qwen3-vl:32b) → Tesseract OCR fallback
+#               → Ollama Vision (qwen3-vl:32b) → Moondream 2 fallback → Tesseract OCR fallback
 #   2. GRID   : Image matching ("Select cars", "click on traffic lights")
 #               → Ollama Vision: send grid image + instruction together,
 #                 get which cell indices should be selected
+#               → Moondream 2 fallback for grid analysis
 #   3. MATH   : "3 + 7 = ?" type mathematical CAPTCHA
 #               → Regex based solution, Ollama fallback
 #   4. SLIDER : Slider CAPTCHA (position estimation)
 #               → Estimate target position with Ollama Vision
 #
+# Fallback chain (Text CAPTCHA example):
+#   Ollama qwen3-vl → Moondream 2 (local VLM) → Tesseract OCR → fail
+#
 # Dependencies:
-#   pip install requests pillow
+#   pip install requests pillow transformers torch einops
 #   pacman -S tesseract tesseract-data-eng python-pytesseract python-opencv
 
 import base64
@@ -126,16 +130,34 @@ def _tesseract_fallback(image_bytes: bytes) -> Optional[str]:
     return None
 
 
-def solve_text(image_bytes: bytes, model: str, timeout: int) -> Optional[str]:
-    """Solve classic character CAPTCHA."""
+def solve_text(
+    image_bytes: bytes,
+    model: str,
+    timeout: int,
+    moondream_model: str = "",
+    moondream_device: str = "cpu",
+) -> Optional[str]:
+    """Solve classic character CAPTCHA.
+
+    Fallback chain: Ollama → Moondream 2 → Tesseract OCR.
+    """
+    # 1. Ollama (primary)
     raw = _ollama(_TEXT_PROMPT, image_bytes, model, timeout)
     if raw:
         solution = re.sub(r"[^A-Za-z0-9]", "", raw)
         if solution:
-            logger.info(f"[CAPTCHA/TEXT] Ollama: '{solution}'")
+            logger.info(f"[CAPTCHA/TEXT] solver=ollama model={model} result='{solution}' length={len(solution)}")
             return solution
-        logger.warning("[CAPTCHA/TEXT] Ollama answered but no characters found")
+        logger.warning(f"[CAPTCHA/TEXT] solver=ollama model={model} result=EMPTY (raw response had no alphanumeric chars)")
 
+    # 2. Moondream fallback
+    if moondream_model:
+        logger.info("[CAPTCHA/TEXT] Trying Moondream fallback...")
+        solution = MoondreamSolver.solve_text(image_bytes, moondream_model, moondream_device)
+        if solution:
+            return solution
+
+    # 3. Tesseract OCR (last resort)
     logger.info("[CAPTCHA/TEXT] Trying Tesseract fallback...")
     return _tesseract_fallback(image_bytes)
 
@@ -150,9 +172,13 @@ def solve_grid(
     model: str,
     timeout: int,
     grid_size: int = 3,
+    moondream_model: str = "",
+    moondream_device: str = "cpu",
 ) -> Optional[List[int]]:
     """
     Solve image grid CAPTCHA ("Select squares containing cars" etc.)
+
+    Fallback chain: Ollama → Moondream 2.
 
     Args:
         grid_image_bytes: Bytes of the entire grid image.
@@ -160,6 +186,8 @@ def solve_grid(
         model:            Ollama vision model.
         timeout:          Timeout.
         grid_size:        Grid size (default 3x3 = 9 cells).
+        moondream_model:  HuggingFace model ID for Moondream fallback (empty = disabled).
+        moondream_device: Device for Moondream inference ("cpu" or "cuda").
 
     Returns:
         List of cell indices to select (0-based, left→right, top→bottom).
@@ -174,23 +202,34 @@ def solve_grid(
         f"Example: 0,3,7\n"
         f"If none match, reply: none"
     )
+    # 1. Ollama (primary)
     raw = _ollama(prompt, grid_image_bytes, model, timeout)
-    if not raw:
-        return None
+    if raw:
+        if raw.strip().lower() == "none":
+            logger.info("[CAPTCHA/GRID] No matching cells found")
+            return []
 
-    if raw.strip().lower() == "none":
-        logger.info("[CAPTCHA/GRID] No matching cells found")
-        return []
+        indices = []
+        for token in re.split(r"[,\s]+", raw):
+            token = token.strip()
+            if token.isdigit():
+                idx = int(token)
+                if 0 <= idx < total:
+                    indices.append(idx)
+        if indices:
+            logger.info(f"[CAPTCHA/GRID] solver=ollama model={model} cells={indices} count={len(indices)}")
+            return indices
 
-    indices = []
-    for token in re.split(r"[,\s]+", raw):
-        token = token.strip()
-        if token.isdigit():
-            idx = int(token)
-            if 0 <= idx < total:
-                indices.append(idx)
-    logger.info(f"[CAPTCHA/GRID] Selected cells: {indices}")
-    return indices if indices else None
+    # 2. Moondream fallback
+    if moondream_model:
+        logger.info("[CAPTCHA/GRID] Trying Moondream fallback...")
+        result = MoondreamSolver.solve_grid(
+            grid_image_bytes, instruction, moondream_model, moondream_device, grid_size
+        )
+        if result is not None:
+            return result
+
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -279,6 +318,127 @@ def solve_slider(
 
 
 # ---------------------------------------------------------------------------
+# Moondream VLM fallback solver
+# ---------------------------------------------------------------------------
+
+MOONDREAM_MODEL_ID = os.environ.get("MOONDREAM_MODEL", "vikhyatk/moondream2")
+MOONDREAM_DEVICE = os.environ.get("MOONDREAM_DEVICE", "cpu")
+
+
+class MoondreamSolver:
+    """
+    Moondream 2 VLM fallback for CAPTCHA solving.
+
+    Lazy-load: the model (~3.7 GB) is downloaded and loaded only on the first
+    call, so it does not slow down normal startup when Ollama is available.
+
+    Usage (standalone — usually called automatically by the fallback chain):
+        solution = MoondreamSolver.solve_text(image_bytes, "vikhyatk/moondream2", "cpu")
+    """
+
+    _model = None
+    _tokenizer = None
+    _loaded_model_id: Optional[str] = None
+
+    @classmethod
+    def _load_model(cls, model_id: str, device: str) -> None:
+        """Download (if needed) and load Moondream model — called once."""
+        if cls._model is not None and cls._loaded_model_id == model_id:
+            return
+        try:
+            import torch
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+
+            logger.info(f"[Moondream] Loading model {model_id} on {device}...")
+            cls._tokenizer = AutoTokenizer.from_pretrained(
+                model_id, trust_remote_code=True,
+            )
+            dtype = torch.float16 if device == "cuda" else torch.float32
+            cls._model = AutoModelForCausalLM.from_pretrained(
+                model_id,
+                trust_remote_code=True,
+                torch_dtype=dtype,
+                device_map={"" : device},
+            )
+            cls._loaded_model_id = model_id
+            logger.info(f"[Moondream] Model loaded successfully on {device}")
+        except Exception as exc:
+            logger.error(f"[Moondream] Failed to load model: {exc}")
+            cls._model = None
+            raise
+
+    # -- Text CAPTCHA --------------------------------------------------------
+
+    @classmethod
+    def solve_text(
+        cls,
+        image_bytes: bytes,
+        model_id: str = MOONDREAM_MODEL_ID,
+        device: str = MOONDREAM_DEVICE,
+    ) -> Optional[str]:
+        """Read characters from a CAPTCHA image using Moondream VLM."""
+        try:
+            from PIL import Image
+
+            cls._load_model(model_id, device)
+            image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+            enc_image = cls._model.encode_image(image)
+            answer = cls._model.answer_question(enc_image, _TEXT_PROMPT, cls._tokenizer)
+            solution = re.sub(r"[^A-Za-z0-9]", "", answer.strip())
+            if solution:
+                logger.info(f"[CAPTCHA/TEXT] solver=moondream model={model_id} result='{solution}' length={len(solution)}")
+                return solution
+            logger.warning(f"[CAPTCHA/TEXT] solver=moondream model={model_id} result=EMPTY")
+        except Exception as exc:
+            logger.warning(f"[CAPTCHA/TEXT] Moondream error: {exc}")
+        return None
+
+    # -- Grid CAPTCHA --------------------------------------------------------
+
+    @classmethod
+    def solve_grid(
+        cls,
+        grid_image_bytes: bytes,
+        instruction: str,
+        model_id: str = MOONDREAM_MODEL_ID,
+        device: str = MOONDREAM_DEVICE,
+        grid_size: int = 3,
+    ) -> Optional[List[int]]:
+        """Solve a grid CAPTCHA using Moondream VLM."""
+        try:
+            from PIL import Image
+
+            cls._load_model(model_id, device)
+            image = Image.open(io.BytesIO(grid_image_bytes)).convert("RGB")
+            enc_image = cls._model.encode_image(image)
+
+            total = grid_size * grid_size
+            prompt = (
+                f"This is a {grid_size}x{grid_size} CAPTCHA grid. "
+                f"Cells numbered 0-{total - 1}, left-to-right, top-to-bottom. "
+                f"Task: {instruction}. "
+                f"Reply with ONLY the matching cell numbers, comma-separated. "
+                f"If none match, reply: none"
+            )
+            answer = cls._model.answer_question(enc_image, prompt, cls._tokenizer)
+            if answer.strip().lower() == "none":
+                logger.info("[CAPTCHA/GRID] Moondream: no matching cells")
+                return []
+
+            indices = [
+                int(t)
+                for t in re.split(r"[,\s]+", answer)
+                if t.strip().isdigit() and 0 <= int(t) < total
+            ]
+            if indices:
+                logger.info(f"[CAPTCHA/GRID] solver=moondream model={model_id} cells={indices} count={len(indices)}")
+                return indices
+        except Exception as exc:
+            logger.warning(f"[CAPTCHA/GRID] Moondream error: {exc}")
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Main CaptchaSolver class
 # ---------------------------------------------------------------------------
 
@@ -290,15 +450,16 @@ class CaptchaSolver:
       - MATH   : solve_math(expression, image_bytes=None)
       - SLIDER : solve_slider(background_bytes, slider_piece_bytes=None)
 
+    Fallback chain for TEXT/GRID: Ollama → Moondream 2 → Tesseract OCR.
+
     Usage:
-        solver = CaptchaSolver(ollama_model="qwen3-vl:32b")
-        # Text CAPTCHA
+        solver = CaptchaSolver(
+            ollama_model="qwen3-vl:32b",
+            moondream_model="vikhyatk/moondream2",
+        )
         text = solver.solve(image_bytes, CaptchaType.TEXT)
-        # Grid CAPTCHA
         cells = solver.solve_grid(grid_img, "Select all cars", grid_size=3)
-        # Math CAPTCHA
         answer = solver.solve_math("7 + 4 = ?")
-        # Slider CAPTCHA
         x_pos = solver.solve_slider(bg_img)
     """
 
@@ -307,9 +468,14 @@ class CaptchaSolver:
         ollama_model: str = "qwen3-vl:32b",
         ollama_timeout: int = 60,
         ollama_url: str = OLLAMA_API_URL,
+        # Moondream fallback — set model to "" to disable
+        moondream_model: str = MOONDREAM_MODEL_ID,
+        moondream_device: str = MOONDREAM_DEVICE,
     ):
         self.model = ollama_model
         self.timeout = ollama_timeout
+        self.moondream_model = moondream_model
+        self.moondream_device = moondream_device
         global OLLAMA_API_URL
         OLLAMA_API_URL = ollama_url
 
@@ -317,7 +483,11 @@ class CaptchaSolver:
     def solve(self, image_bytes: bytes, captcha_type: CaptchaType = CaptchaType.TEXT) -> Optional[Union[str, List[int], int]]:
         """General solver; specify type or use default TEXT."""
         if captcha_type == CaptchaType.TEXT:
-            return solve_text(image_bytes, self.model, self.timeout)
+            return solve_text(
+                image_bytes, self.model, self.timeout,
+                moondream_model=self.moondream_model,
+                moondream_device=self.moondream_device,
+            )
         raise ValueError(f"This method is only for TEXT; use specific methods for other types.")
 
     def solve_grid(
@@ -327,7 +497,11 @@ class CaptchaSolver:
         grid_size: int = 3,
     ) -> Optional[List[int]]:
         """Solve grid CAPTCHA — return which cells to select."""
-        return solve_grid(grid_image_bytes, instruction, self.model, self.timeout, grid_size)
+        return solve_grid(
+            grid_image_bytes, instruction, self.model, self.timeout, grid_size,
+            moondream_model=self.moondream_model,
+            moondream_device=self.moondream_device,
+        )
 
     def solve_math(
         self,

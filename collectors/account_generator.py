@@ -7,6 +7,7 @@
 
 import json
 import logging
+import os
 import random
 import string
 from datetime import datetime, timezone
@@ -224,7 +225,25 @@ class AccountRegistrar:
             return {}
 
         ollama_model = captcha_cfg.get("ollama_model", "qwen3-vl:32b")
-        solver = CaptchaSolver(ollama_model=ollama_model)
+
+        # Moondream fallback — from config or env vars
+        moondream_model = captcha_cfg.get(
+            "moondream_model",
+            os.environ.get("MOONDREAM_MODEL", "vikhyatk/moondream2"),
+        )
+        moondream_device = captcha_cfg.get(
+            "moondream_device",
+            os.environ.get("MOONDREAM_DEVICE", "cpu"),
+        )
+        # Allow disabling via moondream_fallback: false in config
+        if not captcha_cfg.get("moondream_fallback", True):
+            moondream_model = ""
+
+        solver = CaptchaSolver(
+            ollama_model=ollama_model,
+            moondream_model=moondream_model,
+            moondream_device=moondream_device,
+        )
         field_name = captcha_cfg.get("field_name", "captcha")
 
         # --- Type: image (classic text CAPTCHA) ---
