@@ -1,10 +1,12 @@
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from main import app  # noqa: E402
+from routers.dashboard import _build_llm_explanation_state  # noqa: E402
 
 
 def test_dashboard_backend_issue_31_paths_are_documented():
@@ -62,6 +64,7 @@ def test_dashboard_finding_detail_documents_llm_explanation_state():
     llm_schema = schemas["DashboardLLMExplanationOut"]
 
     assert "llm_explanation" in detail_schema["properties"]
+    assert "/dashboard/findings/{finding_id}/llm-analysis" in openapi["paths"]
     assert {
         "status",
         "text",
@@ -74,3 +77,14 @@ def test_dashboard_finding_detail_documents_llm_explanation_state():
         "source",
         "is_available",
     }.issubset(set(llm_schema["required"]))
+
+
+def test_dashboard_finding_detail_uses_fallback_when_llm_metadata_is_missing():
+    record = SimpleNamespace(analysis_result=None)
+
+    explanation = _build_llm_explanation_state(record, "Deterministic fallback summary.")
+
+    assert explanation.status == "fallback"
+    assert explanation.source == "deterministic-fallback"
+    assert explanation.is_available is False
+    assert "deterministic" in explanation.fallback_reason.lower()

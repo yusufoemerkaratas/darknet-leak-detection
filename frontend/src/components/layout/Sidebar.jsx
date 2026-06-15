@@ -45,21 +45,22 @@ function Sidebar({ activeItem, isOpen, onClose, onSelectItem, statusCards = [] }
       />
 
       <aside
-        className={`panel-surface fixed inset-y-3 left-3 z-40 flex w-[244px] flex-col rounded-[16px] px-4 py-4 transition duration-300 xl:inset-y-4 xl:left-4 xl:w-[240px] ${
+        className={`fixed inset-y-3 left-3 z-40 flex w-[244px] flex-col rounded-[16px] px-4 py-4 transition duration-300 xl:inset-y-4 xl:left-4 xl:w-[240px] ${
           isOpen ? 'translate-x-0' : '-translate-x-[120%] xl:translate-x-0'
         }`}
+        style={{ backgroundColor: 'var(--lg-card, #0c1114)', borderRight: '1px solid rgba(255,255,255,0.02)' }}
       >
         <div className="mb-5 flex items-start justify-between">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/30 via-violet-500/25 to-cyan-400/20 soft-ring">
-              <Shield className="h-5 w-5 text-indigo-200" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl soft-ring" style={{ background: 'linear-gradient(135deg, rgba(56,189,248,0.08), rgba(99,102,241,0.06))' }}>
+              <Shield className="h-5 w-5" style={{ color: 'var(--lg-accent, #38bdf8)' }} />
             </div>
 
             <div>
-              <p className="font-display text-[1.35rem] font-semibold tracking-tight text-white">
+              <p className="font-display text-[1.35rem] font-semibold tracking-tight" style={{ color: 'var(--lg-text, #e6eef6)' }}>
                 LeakGuard
               </p>
-              <p className="max-w-[150px] text-[10px] leading-4 text-slate-400">
+              <p className="max-w-[150px] text-[10px] leading-4" style={{ color: 'var(--lg-muted, #98a2b3)' }}>
                 AI Basics Leak Detection System
               </p>
             </div>
@@ -83,8 +84,8 @@ function Sidebar({ activeItem, isOpen, onClose, onSelectItem, statusCards = [] }
               <button
                 className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left transition ${
                   isActive
-                    ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-[0_0_30px_rgba(99,102,241,0.25)]'
-                    : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'
+                    ? 'text-white shadow-[0_0_30px_rgba(56,189,248,0.12)]'
+                    : 'hover:bg-white/5'
                 }`}
                 key={item.id}
                 onClick={() => onSelectItem(item.id)}
@@ -109,10 +110,10 @@ function Sidebar({ activeItem, isOpen, onClose, onSelectItem, statusCards = [] }
               return (
                 <button
                   className={`group flex w-full items-center justify-between rounded-lg border-l-2 px-2.5 py-1.5 text-left transition ${
-                    isActive
-                      ? 'border-cyan-400 bg-cyan-500/10 text-cyan-100'
-                      : 'border-transparent text-slate-500 hover:bg-white/5 hover:text-slate-200'
-                  }`}
+                      isActive
+                        ? 'border-[rgba(56,189,248,0.18)] bg-[rgba(56,189,248,0.04)]'
+                        : 'border-transparent hover:bg-white/5'
+                    }`}
                   key={item.id}
                   onClick={() => onSelectItem(item.id)}
                   type="button"
@@ -124,9 +125,10 @@ function Sidebar({ activeItem, isOpen, onClose, onSelectItem, statusCards = [] }
                   <ArrowRight
                     className={`h-3 w-3 transition ${
                       isActive
-                        ? 'translate-x-0 text-cyan-200'
-                        : 'text-slate-600 group-hover:translate-x-0.5 group-hover:text-slate-300'
+                        ? 'translate-x-0'
+                        : 'group-hover:translate-x-0.5'
                     }`}
+                    style={{ color: isActive ? 'var(--lg-accent, #38bdf8)' : 'rgba(148,163,184,0.6)' }}
                   />
                 </button>
               )
@@ -136,7 +138,7 @@ function Sidebar({ activeItem, isOpen, onClose, onSelectItem, statusCards = [] }
 
         <div className="mt-auto space-y-2 pt-4">
           {liveMonitoringRow ? (
-            <section className="panel-muted rounded-[14px] p-3">
+            <section className="rounded-[14px] p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.02)' }}>
               <div className="flex items-center gap-2 text-[10px]">
                 <span className="signal-dot h-2.5 w-2.5 rounded-full bg-emerald-400" />
                 <span className="font-medium uppercase tracking-[0.16em] text-slate-300">

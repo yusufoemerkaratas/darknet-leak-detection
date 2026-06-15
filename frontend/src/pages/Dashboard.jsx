@@ -26,6 +26,7 @@ import {
   getDashboardBackendStats,
   getDashboardOverview,
   getFindingDetail,
+  analyzeFindingWithLLM,
   updateFindingStatus,
 } from '../api/client'
 import { severityTheme } from '../styles/theme'
@@ -169,7 +170,7 @@ function aggregateCompanies(findings) {
       if (right.count !== left.count) return right.count - left.count
       return right.score - left.score
     })
-    .slice(0, 5)
+    .slice(0, 10)
 }
 
 function mergeBackendStats(dashboardOverview, backendStats, companies) {
@@ -350,6 +351,7 @@ function Dashboard() {
   const [isFindingDetailLoading, setIsFindingDetailLoading] = useState(false)
   const [findingDetailError, setFindingDetailError] = useState('')
   const [isUpdatingFindingStatus, setIsUpdatingFindingStatus] = useState(false)
+  const [isAnalyzingFindingWithLLM, setIsAnalyzingFindingWithLLM] = useState(false)
   const [isReportOpen, setIsReportOpen] = useState(false)
 
   useEffect(() => {
@@ -659,6 +661,7 @@ function Dashboard() {
     setFindingDetailError('')
     setIsFindingDetailLoading(false)
     setIsUpdatingFindingStatus(false)
+    setIsAnalyzingFindingWithLLM(false)
   }
 
   const handleUpdateFindingStatus = async (status) => {
@@ -675,6 +678,23 @@ function Dashboard() {
       setFindingDetailError(error.message || 'Failed to update finding status.')
     } finally {
       setIsUpdatingFindingStatus(false)
+    }
+  }
+
+  const handleAnalyzeFindingWithLLM = async () => {
+    if (!selectedFindingId) return
+
+    setIsAnalyzingFindingWithLLM(true)
+    setFindingDetailError('')
+
+    try {
+      const updatedFinding = await analyzeFindingWithLLM(selectedFindingId)
+      setSelectedFindingDetail(updatedFinding)
+      syncFindingAcrossDashboard(updatedFinding)
+    } catch (error) {
+      setFindingDetailError(error.message || 'Failed to run AI analysis.')
+    } finally {
+      setIsAnalyzingFindingWithLLM(false)
     }
   }
 
@@ -960,8 +980,10 @@ function Dashboard() {
           error={findingDetailError}
           finding={selectedFindingDetail}
           isLoading={isFindingDetailLoading}
+          isAnalyzingWithLLM={isAnalyzingFindingWithLLM}
           isUpdatingStatus={isUpdatingFindingStatus}
           onClose={handleCloseFindingDetail}
+          onAnalyzeWithLLM={handleAnalyzeFindingWithLLM}
           onStatusChange={handleUpdateFindingStatus}
         />
       ) : null}

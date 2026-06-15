@@ -1,6 +1,6 @@
 metadata:
   version: "1.1"
-  last_updated: "2026-05-25"
+  last_updated: "2026-06-14"
 
 companies:
 
@@ -24,6 +24,326 @@ companies:
   - name: Apple
     aliases: [AAPL, Apple Inc]
     domains: [apple.com]
+
+  # ── Additional high-signal companies ──────────────────────────
+  - name: Tesla
+    domains: [tesla.com]
+
+  - name: NVIDIA
+    aliases: [NVDA]
+    domains: [nvidia.com]
+
+  - name: Intel
+    aliases: [INTC]
+    domains: [intel.com]
+
+  - name: Cisco
+    aliases: [CSCO]
+    domains: [cisco.com]
+
+  - name: Oracle
+    aliases: [ORCL]
+    domains: [oracle.com]
+
+  - name: IBM
+    aliases: [IBM]
+    domains: [ibm.com]
+
+  - name: SAP
+    aliases: [SAP]
+    domains: [sap.com]
+
+  - name: Sony
+    domains: [sony.com]
+
+  - name: Samsung
+    domains: [samsung.com]
+
+  - name: Huawei
+    domains: [huawei.com]
+
+  - name: Tencent
+    domains: [tencent.com]
+
+  - name: Alibaba
+    domains: [alibaba.com]
+
+  - name: ByteDance
+    domains: [bytedance.com]
+
+  - name: Netflix
+    aliases: [NFLX]
+    domains: [netflix.com]
+
+  - name: PayPal
+    aliases: [PYPL]
+    domains: [paypal.com]
+
+  - name: Adobe
+    aliases: [ADBE]
+    domains: [adobe.com]
+
+  - name: Dropbox
+    aliases: [DBX]
+    domains: [dropbox.com]
+
+  - name: Salesforce
+    aliases: [CRM]
+    domains: [salesforce.com]
+
+  - name: Zoom
+    aliases: [ZM]
+    domains: [zoom.com]
+
+  - name: Uber
+    aliases: [UBER]
+    domains: [uber.com]
+
+  - name: GitHub
+    domains: [github.com]
+
+  - name: Cloudflare
+    domains: [cloudflare.com]
+
+  - name: Okta
+    domains: [okta.com]
+
+  - name: Atlassian
+    aliases: [TEAM]
+    domains: [atlassian.com]
+
+  - name: Stripe
+    domains: [stripe.com]
+
+  - name: Coinbase
+    aliases: [COIN]
+    domains: [coinbase.com]
+
+  # ── Additional synthetic / reference companies ───────────────
+  - name: Apex Financial Group
+  - name: Northbridge Bank
+  - name: Silvergate Insurance
+  - name: Helios Medical Systems
+  - name: NovaCloud Technologies
+  - name: BrightPath Logistics
+  - name: IronPeak Cybersecurity
+  - name: BlueRiver Pharma
+  - name: MetroLink Mobility
+  - name: GreenStone Energy
+  - name: Quantum Retail Solutions
+  - name: Vertex Data Services
+  - name: RedOak Manufacturing
+  - name: LunaHealth Clinics
+  - name: OrbitPay Systems
+  - name: Atlas Automotive Group
+  - name: Summit Legal Partners
+  - name: ClearView Analytics
+  - name: EchoPoint Telecom
+  - name: PrimeGrid Infrastructure
+  - name: CoreNest Software
+  - name: DeltaWorks Engineering
+  - name: UrbanFleet Transport
+  - name: Skyline Media Group
+  - name: TerraFood Industries
+  - name: OmniTrade Global
+  - name: NeonByte Solutions
+  - name: SecureAxis Ltd
+  - name: MedCore Diagnostics
+  - name: RapidCart Commerce
+  - name: AlphaBridge Consulting
+  - name: NextWave Robotics
+  - name: EverTrust Bank
+  - name: NordicCloud Hosting
+  - name: Pioneer Health Network
+  - name: BlackStone Supply Chain
+  - name: Sunrise Education Group
+  - name: DataForge Labs
+  - name: VectorAI Systems
+  - name: Cobalt Retail GmbH
+  - name: EuroLink Payment Services
+  - name: SmartGate Logistics
+  - name: BluePeak Capital
+  - name: CarePlus Hospital Group
+  - name: TitanWare Technologies
+  - name: NeoMarket Europe
+  - name: Phoenix Legal Services
+  - name: GlobalParts Automotive
+  - name: SafeHarbor Insurance
+  - name: InfiniCore Networks
+  - name: CloudNest Hosting
+  - name: Aurum Pharma
+  - name: BavariaTech Solutions
+  - name: MediNova Group
+  - name: QuickPay Europe
+  - name: FreshLine Foods
+  - name: CyberBridge Analytics
+  - name: Westfield Energy
+  - name: UrbanCare Medical
+  - name: TradeSphere GmbH
+  - name: IronLake Industries
+  - name: BrightSignal Telecom
+  - name: NorthStar Education
+  - name: DataShield Systems
+  - name: AeroMotion Logistics
+  - name: FinAxis Capital
+  - name: Solaris Retail Group
+  - name: ZenithCloud GmbH
+  - name: MedSphere Clinics
+  - name: PolyCore Manufacturing
+  - name: RapidFleet Europe
+  - name: SilverLine Technologies
+  - name: GreenField Agro
+  - name: TrustLink Payments
+  - name: NovaTrade GmbH
+  - name: BlueAxis Software
+  - name: SecureWave Cyber Defense
+  - name: HelixData Solutions
+  - name: PrimeCare Medical
+  - name: EuroFleet Mobility
+  - name: DataVault Systems
+  - name: NextGen Pharma
+  - name: SmartRetail Europe
+  - name: CloudBridge Networks
+  - name: MetroPay GmbH
+  - name: BrightMind Education
+  - name: IronCore Robotics
+  - name: ClearPath Consulting
+  - name: HealthLine Diagnostics
+  - name: SkyNet Logistics
+  - name: ApexCloud Services
+  - name: RedLine Automotive
+  - name: QuantumPay Systems
+  - name: CareBridge Health
+  - name: Optima Legal Group
+  - name: TerraLogistics GmbH
+  - name: UrbanData Analytics
+  - name: BlackForest Technologies
+  - name: SilverCloud Hosting
+  - name: GreenWave Energy
+  - name: MedTrust Clinics
+  - name: NorthPoint Capital
+  - name: NeoBank Digital
+  - name: SafeNet Systems
+  - name: LunaRetail Group
+  - name: VectorHealth Solutions
+  - name: PrimeSource Manufacturing
+  - name: BlueHarbor Insurance
+  - name: CloudAxis Europe
+  - name: DataSpring Labs
+  - name: OmniHealth Network
+  - name: PioneerPay Services
+  - name: HeliosAI Technologies
+  - name: MetroGrid Infrastructure
+  - name: RapidTrade Solutions
+  - name: AurumBank Europe
+  - name: CoreBridge Software
+  - name: TitanCloud Systems
+  - name: SecureNest GmbH
+  - name: BrightCare Hospitals
+  - name: NovaLegal Partners
+  - name: UrbanMarket Retail
+  - name: SkylinePay GmbH
+  - name: IronGate Security
+  - name: GreenCore Energy
+  - name: MediLink Europe
+  - name: FreshMarket Logistics
+  - name: CobaltData Services
+  - name: AlphaFleet Mobility
+  - name: TrustCore Insurance
+  - name: NextRetail GmbH
+  - name: QuantumHealth Systems
+  - name: BlueNova Technologies
+  - name: SilverPoint Finance
+  - name: TerraCloud Hosting
+  - name: CyberPeak Systems
+  - name: PrimeLink Telecom
+  - name: NordBridge Consulting
+  - name: ClearBank Digital
+  - name: MedAxis Group
+  - name: AeroLink Transport
+  - name: BlackLake Industries
+  - name: DataPulse Analytics
+  - name: VertexPay Europe
+  - name: HelixRetail Solutions
+  - name: SunriseHealth Clinics
+  - name: SmartCore Software
+  - name: RedOak Energy
+  - name: OmniLegal Services
+  - name: GreenLine Supply Chain
+  - name: RapidCloud GmbH
+  - name: LunaBank Digital
+  - name: SkyBridge Networks
+  - name: CarePoint Medical
+  - name: IronPeak Manufacturing
+  - name: NorthWave Technologies
+  - name: BrightFleet Logistics
+  - name: SecureGrid Systems
+  - name: NeoCloud Hosting
+  - name: AtlasPay Services
+  - name: EuroCare Clinics
+  - name: PrimeData Labs
+  - name: CobaltBank Group
+  - name: UrbanEnergy GmbH
+  - name: SilverFleet Mobility
+  - name: NovaPharma Europe
+  - name: BlueCore Analytics
+  - name: TrustWave Payments
+  - name: MetroHealth Network
+  - name: DataHarbor Systems
+  - name: TitanRetail Group
+  - name: ClearSignal Telecom
+  - name: ApexLegal Partners
+  - name: FreshCore Foods
+  - name: QuantumCloud GmbH
+  - name: MedNova Diagnostics
+  - name: NextBridge Consulting
+  - name: SolarisPay Europe
+  - name: BlackForest Retail
+  - name: GreenAxis Agro
+  - name: CoreVault Systems
+  - name: RapidMed Clinics
+  - name: SkyFleet Transport
+  - name: HeliosRetail Group
+  - name: SecureLine Insurance
+  - name: NorthStar Cloud
+  - name: VectorLegal GmbH
+  - name: UrbanPharma Group
+  - name: PrimeFleet Europe
+  - name: BlueRiver Data
+  - name: CobaltCloud Systems
+  - name: NeoTrade Global
+  - name: IronBridge Robotics
+  - name: CareVault Health
+  - name: SilverAxis Capital
+  - name: TerraPay Services
+  - name: OmniGrid Infrastructure
+  - name: BrightBridge Software
+  - name: DataNest Analytics
+  - name: AeroCore Logistics
+  - name: TrustHarbor Bank
+  - name: MetroCloud Hosting
+  - name: GreenPeak Energy
+  - name: LunaLegal Services
+  - name: RapidRetail GmbH
+  - name: ClearCore Manufacturing
+  - name: NovaFleet Mobility
+  - name: CyberNest Defense
+  - name: HelixBank Digital
+  - name: NorthPoint Telecom
+  - name: SmartHealth Clinics
+  - name: PrimeMarket Europe
+  - name: BlueSignal Networks
+  - name: AtlasData Services
+  - name: EuroPay Systems
+  - name: SecureCore Technologies
+  - name: MedFleet Logistics
+  - name: TitanLegal Partners
+  - name: SkyCare Hospitals
+  - name: QuantumRetail GmbH
+  - name: GreenHarbor Foods
+  - name: CobaltFleet Europe
+  - name: UrbanCore Software
+  - name: DataLine Systems
 
   # ── RansomHouse victims (auto-imported from DB 2026-05-25) ──
   - name: ABS-CBN Broadcasting

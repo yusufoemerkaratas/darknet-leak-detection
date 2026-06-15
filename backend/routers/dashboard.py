@@ -1,7 +1,10 @@
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import json
+import os
 from typing import Literal, Optional
+from urllib import error, request
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
@@ -382,11 +385,11 @@ def _build_llm_explanation_state(
     enrichment = _get_llm_enrichment(record)
     if not enrichment:
         return DashboardLLMExplanationOut(
-            status="unavailable",
+            status="fallback",
             text=fallback_text,
             source="deterministic-fallback",
             is_available=False,
-            fallback_reason="No LLM enrichment metadata is stored for this finding.",
+            fallback_reason="No LLM enrichment metadata is stored for this finding; deterministic explanation shown.",
         )
 
     status = str(enrichment.get("status") or "unavailable").lower()
@@ -747,6 +750,153 @@ def _apply_review_status(record: LeakRecord, status: str) -> None:
     record.is_false_positive = status == "False Positive"
 
 
+def _build_llm_analysis_text(record: LeakRecord) -> str:
+    return "\n".join(
+        part
+        for part in [
+            record.title or "",
+            record.raw_content_text or "",
+            record.raw_url or "",
+        ]
+        if part
+    )
+
+
+def _build_llm_analysis_payload(record: LeakRecord) -> dict:
+    return {
+        "classification": record.classification,
+        "risk_score": _compute_risk_score(record),
+        "classification_rule": (
+            record.analysis_result.classification_rule
+            if record.analysis_result and record.analysis_result.classification_rule
+            else _infer_finding_type(record)
+        ),
+        "matched_companies": (
+            record.analysis_result.matched_companies
+            if record.analysis_result and isinstance(record.analysis_result.matched_companies, list)
+            else []
+        ),
+        "detected_patterns": (
+            record.analysis_result.detected_patterns
+            if record.analysis_result and isinstance(record.analysis_result.detected_patterns, dict)
+            else {}
+        ),
+        "terminology_hits": (
+            record.analysis_result.terminology_hits
+            if record.analysis_result and isinstance(record.analysis_result.terminology_hits, list)
+            else []
+        ),
+    }
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _extract_llm_text(payload: dict) -> str:
+    if isinstance(payload.get("response"), str):
+        return payload["response"]
+    if isinstance(payload.get("text"), str):
+        return payload["text"]
+    if isinstance(payload.get("output"), str):
+        return payload["output"]
+
+    choices = payload.get("choices")
+    if isinstance(choices, list) and choices:
+        first = choices[0]
+        if isinstance(first, dict):
+            if isinstance(first.get("text"), str):
+                return first["text"]
+            message = first.get("message")
+            if isinstance(message, dict) and isinstance(message.get("content"), str):
+                return message["content"]
+    return ""
+
+
+def _build_llm_prompt(text: str, analysis: dict) -> str:
+    return (
+        "You are assisting a data leak analyst. "
+        "Use the deterministic analysis result as the source of truth. "
+        "Do not change the score or classification. "
+        "Write one concise threat explanation in 2-3 sentences.\n\n"
+        f"Classification: {analysis.get('classification')}\n"
+        f"Risk score: {analysis.get('risk_score')}\n"
+        f"Classification rule: {analysis.get('classification_rule')}\n"
+        f"Matched companies: {analysis.get('matched_companies')}\n"
+        f"Detected patterns: {analysis.get('detected_patterns')}\n"
+        f"Terminology hits: {analysis.get('terminology_hits')}\n\n"
+        f"Leak text sample:\n{text[:2500]}"
+    )
+
+
+def _run_llm_enrichment(text: str, analysis: dict) -> dict:
+    if not _env_flag("LLM_ANALYSIS_ENABLED", False):
+        return {"status": "disabled", "explanation": None}
+
+    provider = os.environ.get("LLM_ANALYSIS_PROVIDER", "ollama").strip().lower()
+    endpoint_url = os.environ.get("LLM_ANALYSIS_URL", "http://localhost:9999/api/generate")
+    model = os.environ.get("LLM_ANALYSIS_MODEL", "llama3.1")
+    api_key = os.environ.get("LLM_ANALYSIS_API_KEY")
+    try:
+        timeout = max(int(os.environ.get("LLM_ANALYSIS_TIMEOUT", "30")), 1)
+    except ValueError:
+        timeout = 30
+
+    prompt = _build_llm_prompt(text, analysis)
+    if provider in {"github-models", "openai-compatible"}:
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You generate concise data leak threat explanations.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+        }
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+        }
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+    else:
+        payload = {"model": model, "prompt": prompt, "stream": False}
+        headers = {"Content-Type": "application/json"}
+
+    try:
+        body = json.dumps(payload).encode("utf-8")
+        req = request.Request(endpoint_url, data=body, headers=headers, method="POST")
+        with request.urlopen(req, timeout=timeout) as response:
+            response_payload = json.loads(response.read().decode("utf-8"))
+        explanation = " ".join(_extract_llm_text(response_payload).strip().split())
+        if not explanation:
+            return {"status": "empty", "explanation": None}
+        return {"status": "ok", "model": model, "explanation": explanation}
+    except error.HTTPError as exc:
+        return {"status": "error", "explanation": None, "error": f"HTTP {exc.code}"}
+    except Exception as exc:
+        return {"status": "error", "explanation": None, "error": str(exc)}
+
+
+def _run_and_store_llm_analysis(record: LeakRecord) -> None:
+    patterns = _get_detected_patterns(record)
+    enrichment = _run_llm_enrichment(
+        _build_llm_analysis_text(record),
+        _build_llm_analysis_payload(record),
+    )
+    patterns["llm_enrichment"] = enrichment
+
+    if record.analysis_result:
+        record.analysis_result.detected_patterns = patterns
+    else:
+        record.analysis_result = AnalysisResult(detected_patterns=patterns)
+
+
 @router.get("/overview", response_model=DashboardOverviewOut)
 def dashboard_overview(
     timeline_range: Literal["7d", "30d", "365d"] = Query(default="7d"),
@@ -853,7 +1003,7 @@ def dashboard_overview(
             .join(LeakRecord, LeakRecord.company_id == Company.id)
             .group_by(Company.id, Company.name)
             .order_by(func.count(LeakRecord.id).desc(), func.max(LeakRecord.risk_score).desc())
-            .limit(5)
+            .limit(10)
             .all()
         )
         top_companies = [
@@ -1026,4 +1176,35 @@ def update_dashboard_finding_status(
         if not preview_item:
             raise HTTPException(status_code=404, detail="Finding not found")
         preview_item["status"] = payload.status
+        return _serialize_preview_detail(preview_item)
+
+
+@router.post("/findings/{finding_id}/llm-analysis", response_model=DashboardFindingDetailOut)
+def analyze_dashboard_finding_with_llm(
+    finding_id: int,
+    db: Session = Depends(get_db),
+):
+    try:
+        record = (
+            db.query(LeakRecord)
+            .options(
+                joinedload(LeakRecord.company),
+                joinedload(LeakRecord.source),
+                joinedload(LeakRecord.analysis_result),
+            )
+            .filter(LeakRecord.id == finding_id)
+            .first()
+        )
+        if not record:
+            raise HTTPException(status_code=404, detail="Finding not found")
+
+        _run_and_store_llm_analysis(record)
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        return _serialize_finding_detail(record)
+    except OperationalError:
+        preview_item = _get_preview_finding_by_id(finding_id)
+        if not preview_item:
+            raise HTTPException(status_code=404, detail="Finding not found")
         return _serialize_preview_detail(preview_item)
