@@ -1,5 +1,4 @@
 import {
-  Activity,
   Database,
   Play,
   Plus,
@@ -13,8 +12,6 @@ import { useEffect, useMemo, useState } from 'react'
 import StatusCard from '../cards/StatusCard'
 import {
   createSource,
-  getSourceHealth,
-  getSourceMetrics,
   getSources,
   testSourceCrawl,
   toggleSource,
@@ -26,9 +23,6 @@ const emptyForm = {
   url: '',
 }
 
-function formatPercent(value) {
-  return `${Math.round((value ?? 0) * 100)}%`
-}
 
 function SourceManagementPanel() {
   const [sources, setSources] = useState([])
@@ -36,19 +30,24 @@ function SourceManagementPanel() {
   const [form, setForm] = useState(emptyForm)
   const [editingSourceId, setEditingSourceId] = useState(null)
   const [selectedSourceId, setSelectedSourceId] = useState(null)
-  const [healthBySource, setHealthBySource] = useState({})
-  const [metricsBySource, setMetricsBySource] = useState({})
   const [statusMessage, setStatusMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [sourcesPage, setSourcesPage] = useState(1)
+  const SOURCES_PER_PAGE = 5
 
-  const selectedSource = useMemo(
-    () => sources.find((source) => source.id === selectedSourceId),
-    [selectedSourceId, sources]
-  )
-  const selectedHealth = selectedSourceId ? healthBySource[selectedSourceId] : null
-  const selectedMetrics = selectedSourceId ? metricsBySource[selectedSourceId] : null
+  const totalSourcesPages = Math.max(1, Math.ceil(sources.length / SOURCES_PER_PAGE))
+  const paginatedSources = useMemo(() => {
+    return sources.slice((sourcesPage - 1) * SOURCES_PER_PAGE, sourcesPage * SOURCES_PER_PAGE)
+  }, [sources, sourcesPage])
+
+  useEffect(() => {
+    if (sourcesPage > totalSourcesPages) {
+      setSourcesPage(totalSourcesPages)
+    }
+  }, [sourcesPage, totalSourcesPages])
+
 
   async function loadSources(nextFilters = filters) {
     setIsLoading(true)
@@ -61,6 +60,7 @@ function SourceManagementPanel() {
           nextFilters.isActive === 'all' ? undefined : nextFilters.isActive === 'active',
       })
       setSources(data)
+      setSourcesPage(1)
       if (!selectedSourceId && data.length > 0) {
         setSelectedSourceId(data[0].id)
       }
@@ -76,20 +76,7 @@ function SourceManagementPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function loadSourceDiagnostics(sourceId) {
-    setErrorMessage('')
 
-    try {
-      const [health, metrics] = await Promise.all([
-        getSourceHealth(sourceId),
-        getSourceMetrics(sourceId),
-      ])
-      setHealthBySource((current) => ({ ...current, [sourceId]: health }))
-      setMetricsBySource((current) => ({ ...current, [sourceId]: metrics }))
-    } catch (error) {
-      setErrorMessage(error.message || 'Failed to load source diagnostics.')
-    }
-  }
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -151,7 +138,6 @@ function SourceManagementPanel() {
     try {
       const job = await testSourceCrawl(sourceId)
       setStatusMessage(`Test crawl queued as job #${job.job_id}.`)
-      await loadSourceDiagnostics(sourceId)
     } catch (error) {
       setErrorMessage(error.message || 'Failed to queue test crawl.')
     }
@@ -279,10 +265,10 @@ function SourceManagementPanel() {
             </div>
             {isLoading ? (
               <p className="px-3 py-3 text-[11px] text-slate-400">Loading sources...</p>
-            ) : sources.length === 0 ? (
+            ) : paginatedSources.length === 0 ? (
               <p className="px-3 py-3 text-[11px] text-slate-400">No sources match this view.</p>
             ) : (
-              sources.map((source) => (
+              paginatedSources.map((source) => (
                 <div
                   className={`grid min-w-[680px] grid-cols-[0.9fr_1.3fr_0.6fr_1.2fr] items-center gap-2 border-t border-slate-800 px-3 py-2 text-[11px] ${
                     selectedSourceId === source.id ? 'bg-cyan-500/5' : 'bg-slate-950/35'
@@ -290,11 +276,8 @@ function SourceManagementPanel() {
                   key={source.id}
                 >
                   <button
-                    className="truncate text-left text-slate-100 hover:text-cyan-200"
-                    onClick={() => {
-                      setSelectedSourceId(source.id)
-                      loadSourceDiagnostics(source.id)
-                    }}
+                    className="truncate text-left text-slate-100 hover:text-cyan-200 inline-block max-w-[140px]"
+                    onClick={() => setSelectedSourceId(source.id)}
                     type="button"
                   >
                     {source.name}
@@ -333,48 +316,34 @@ function SourceManagementPanel() {
               ))
             )}
           </div>
+          {sources.length > SOURCES_PER_PAGE ? (
+            <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
+              <span>Showing {(sourcesPage - 1) * SOURCES_PER_PAGE + 1} to {Math.min(sourcesPage * SOURCES_PER_PAGE, sources.length)} of {sources.length} sources</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  className="rounded border border-slate-800 bg-slate-950/80 px-2.5 py-1 text-slate-300 disabled:opacity-40"
+                  disabled={sourcesPage === 1}
+                  onClick={() => setSourcesPage(sourcesPage - 1)}
+                  type="button"
+                >
+                  Prev
+                </button>
+                <span className="rounded border border-slate-700 bg-[#060b18] px-2 py-0.5 text-slate-200">
+                  {sourcesPage}
+                </span>
+                <button
+                  className="rounded border border-slate-800 bg-slate-950/80 px-2.5 py-1 text-slate-300 disabled:opacity-40"
+                  disabled={sourcesPage === totalSourcesPages}
+                  onClick={() => setSourcesPage(sourcesPage + 1)}
+                  type="button"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
-
-      {selectedSource ? (
-        <div className="mt-3 grid gap-3 lg:grid-cols-3">
-          <div className="panel-muted rounded-xl p-3">
-            <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-slate-200">
-              <Activity className="h-4 w-4 text-emerald-300" />
-              Health
-            </div>
-            {selectedHealth ? (
-              <div className="space-y-1.5 text-[11px] text-slate-400">
-                <p>Status: <span className="text-slate-100">{selectedHealth.status}</span></p>
-                <p>Success rate: <span className="text-slate-100">{formatPercent(selectedHealth.success_rate)}</span></p>
-                <p>Errors: <span className="text-slate-100">{selectedHealth.failed_jobs}</span></p>
-                <p>Avg latency: <span className="text-slate-100">{selectedHealth.average_latency_seconds ?? 'n/a'}s</span></p>
-              </div>
-            ) : (
-              <button
-                className="rounded-lg border border-slate-700 bg-slate-950/60 px-2.5 py-1.5 text-[11px] text-slate-200"
-                onClick={() => loadSourceDiagnostics(selectedSource.id)}
-                type="button"
-              >
-                Load health
-              </button>
-            )}
-          </div>
-
-          <div className="panel-muted rounded-xl p-3 lg:col-span-2">
-            <div className="mb-2 text-[12px] font-medium text-slate-200">Recent Metrics</div>
-            {selectedMetrics ? (
-              <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-400">
-                <span>Total records <strong className="block text-slate-100">{selectedMetrics.total_records}</strong></span>
-                <span>Inserted <strong className="block text-slate-100">{selectedMetrics.inserted_records}</strong></span>
-                <span>Duplicates <strong className="block text-slate-100">{selectedMetrics.duplicate_records}</strong></span>
-              </div>
-            ) : (
-              <p className="text-[11px] text-slate-400">Select a source to load metrics.</p>
-            )}
-          </div>
-        </div>
-      ) : null}
     </StatusCard>
   )
 }

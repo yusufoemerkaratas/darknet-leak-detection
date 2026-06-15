@@ -5,7 +5,7 @@ function Topbar({ onOpenSidebar, searchValue, onSearchChange, showNotifications 
   const [theme, setTheme] = useState(() => {
     try {
       return localStorage.getItem('theme') || 'dark'
-    } catch (e) {
+    } catch {
       return 'dark'
     }
   })
@@ -14,7 +14,7 @@ function Topbar({ onOpenSidebar, searchValue, onSearchChange, showNotifications 
     try {
       document.documentElement.setAttribute('data-theme', theme)
       localStorage.setItem('theme', theme)
-    } catch (e) {
+    } catch {
       /* ignore */
     }
   }, [theme])

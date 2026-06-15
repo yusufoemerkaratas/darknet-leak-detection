@@ -19,7 +19,7 @@ function DashboardShell({
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#050816] text-slate-100">
+    <div className="relative min-h-screen overflow-hidden" style={{ background: 'var(--lg-body-bg)', color: 'var(--lg-text)' }}>
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute inset-x-0 top-0 h-[320px] bg-[radial-gradient(circle_at_top,rgba(79,70,229,0.18),transparent_54%)]" />
         <div className="absolute -left-24 top-24 h-72 w-72 rounded-full bg-blue-500/8 blur-3xl" />
@@ -36,7 +36,7 @@ function DashboardShell({
           statusCards={sidebarStatusCards}
         />
 
-        <div className="flex min-w-0 flex-1 flex-col xl:pl-[260px]">
+        <div className="flex min-w-0 flex-1 flex-col xl:pl-[230px]">
           <Topbar
             onOpenSidebar={() => setSidebarOpen(true)}
             searchValue={searchValue}
@@ -47,7 +47,7 @@ function DashboardShell({
           />
 
           <main className="flex-1 px-1 pb-1 pt-1.5 sm:px-1.5 xl:px-2">
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px] 2xl:grid-cols-[minmax(0,1fr)_280px]">
               <section className="min-w-0 space-y-3">{children}</section>
               <aside className="min-w-0 space-y-3">{rightPanel}</aside>
             </div>

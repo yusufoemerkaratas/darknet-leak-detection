@@ -6,11 +6,9 @@ export const navigationItems = [
   { id: 'sources', label: 'Sources' },
   { id: 'visualizations', label: 'Visualizations' },
   { id: 'reports', label: 'Reports' },
-  { id: 'settings', label: 'Settings' },
 ]
 
 export const rightPanelItems = [
-  { id: 'monitoring-feed', label: 'Live Monitoring' },
   { id: 'severity-legend', label: 'Severity Legend' },
   { id: 'data-sources-panel', label: 'Data Sources' },
   { id: 'engine-status-panel', label: 'Engine Status' },

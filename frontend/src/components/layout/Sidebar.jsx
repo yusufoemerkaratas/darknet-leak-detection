@@ -22,19 +22,12 @@ const iconMap = {
   sources: Database,
   visualizations: BarChart3,
   reports: FileText,
-  settings: Settings,
-  'monitoring-feed': Bell,
   'severity-legend': BarChart3,
   'data-sources-panel': Database,
   'engine-status-panel': Activity,
 }
 
-function Sidebar({ activeItem, isOpen, onClose, onSelectItem, statusCards = [] }) {
-  const primaryStatusCard = statusCards.find((card) => card.id === 'system-status')
-  const liveMonitoringRow = primaryStatusCard?.rows.find(
-    (row) => row.label === 'Live Monitoring'
-  )
-
+function Sidebar({ activeItem, isOpen, onClose, onSelectItem }) {
   return (
     <>
       <div
@@ -45,7 +38,7 @@ function Sidebar({ activeItem, isOpen, onClose, onSelectItem, statusCards = [] }
       />
 
       <aside
-        className={`fixed inset-y-3 left-3 z-40 flex w-[244px] flex-col rounded-[16px] px-4 py-4 transition duration-300 xl:inset-y-4 xl:left-4 xl:w-[240px] ${
+        className={`fixed inset-y-3 left-3 z-40 flex w-[210px] flex-col rounded-[16px] px-4 py-4 transition duration-300 xl:inset-y-4 xl:left-4 xl:w-[210px] ${
           isOpen ? 'translate-x-0' : '-translate-x-[120%] xl:translate-x-0'
         }`}
         style={{ backgroundColor: 'var(--lg-card, #0c1114)', borderRight: '1px solid rgba(255,255,255,0.02)' }}
@@ -137,19 +130,6 @@ function Sidebar({ activeItem, isOpen, onClose, onSelectItem, statusCards = [] }
         </div>
 
         <div className="mt-auto space-y-2 pt-4">
-          {liveMonitoringRow ? (
-            <section className="rounded-[14px] p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.02)' }}>
-              <div className="flex items-center gap-2 text-[10px]">
-                <span className="signal-dot h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                <span className="font-medium uppercase tracking-[0.16em] text-slate-300">
-                  Live Monitoring
-                </span>
-              </div>
-              <p className="mt-2 text-[11px] leading-4 text-slate-500">
-                All systems operational
-              </p>
-            </section>
-          ) : null}
           <section className="panel-muted rounded-[14px] p-3">
             <div className="mb-2 flex items-center justify-between">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
