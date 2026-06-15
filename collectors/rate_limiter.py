@@ -50,8 +50,10 @@ class RateLimiter:
 
     def __init__(self, forum_id: str, rate_cfg: dict, rotate_user_agent: bool = True):
         self.forum_id = forum_id
-        self.min_delay: float = rate_cfg.get("min_delay", 2.0)
-        self.max_delay: float = rate_cfg.get("max_delay", 6.0)
+        self.base_min_delay: float = rate_cfg.get("min_delay", 2.0)
+        self.base_max_delay: float = rate_cfg.get("max_delay", 6.0)
+        self.min_delay: float = self.base_min_delay
+        self.max_delay: float = self.base_max_delay
         self.max_per_hour: int = rate_cfg.get("max_requests_per_hour", 120)
         self.backoff_429: int = rate_cfg.get("backoff_on_429", 60)
         self.rotate_ua = rotate_user_agent
@@ -59,6 +61,9 @@ class RateLimiter:
         # Sliding window: timestamps of the last N requests (last hour)
         self._timestamps: deque = deque()
         self._last_request_time: float = 0.0
+        
+        # Track successive successes to recover delay
+        self._success_streak: int = 0
 
     # ------------------------------------------------------------------
     # Public
@@ -80,10 +85,18 @@ class RateLimiter:
         """
         Called when the server returns HTTP 429.
         Waits backoff_429 * 2^retry seconds (capped at 10 min).
+        Also dynamically increases the base request delay.
         """
         wait = min(self.backoff_429 * (2 ** retry), 600)
+        
+        # Adaptive backoff: increase delays
+        self.min_delay = min(self.min_delay * 1.5, 30.0)
+        self.max_delay = min(self.max_delay * 1.5, 60.0)
+        self._success_streak = 0
+        
         logger.warning(
-            f"[{self.forum_id}] HTTP 429 — backing off {wait}s (retry #{retry + 1})"
+            f"[{self.forum_id}] HTTP 429 — backing off {wait}s (retry #{retry + 1}). "
+            f"Adaptive delay increased to {self.min_delay:.1f}-{self.max_delay:.1f}s."
         )
         time.sleep(wait)
 
@@ -94,14 +107,21 @@ class RateLimiter:
         delay: float,
         error: Optional[str] = None,
     ) -> None:
-        """Write a structured log line for every request attempt."""
+        """Write a structured log line for every request attempt and adjust delays."""
         ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        if error:
+        if error or status in (429, 403, 502, 503, 504):
+            self._success_streak = 0
             logger.warning(
                 f"[{self.forum_id}] {ts} | {url} | status={status} | "
                 f"delay={delay:.2f}s | error={error}"
             )
         else:
+            self._success_streak += 1
+            # Recover delay gradually if we are above base
+            if self.min_delay > self.base_min_delay and self._success_streak > 5:
+                self.min_delay = max(self.base_min_delay, self.min_delay * 0.9)
+                self.max_delay = max(self.base_max_delay, self.max_delay * 0.9)
+                
             logger.info(
                 f"[{self.forum_id}] {ts} | {url} | status={status} | delay={delay:.2f}s"
             )
