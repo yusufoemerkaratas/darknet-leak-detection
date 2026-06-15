@@ -61,6 +61,19 @@ def _run_with_job(db, forum_id: str, source_url: str, run_fn) -> None:
             job.total_records     = found
             job.inserted_records  = new
             job.duplicate_records = max(0, found - new)
+            
+            job.error_count_transient = result.get("errors_transient", 0)
+            job.error_count_persistent = result.get("errors_persistent", 0)
+            job.average_latency_ms = result.get("average_latency_ms", 0)
+
+            # Alert if success rate (inserted/found) is too low and we found a significant number of records
+            if found > 10 and (new / found) < 0.10:
+                logger.warning(f"[{forum_id}] Alert: Low success rate! Only {new} inserted out of {found} found.")
+
+            # Alert if too many persistent errors
+            if job.error_count_persistent > 5:
+                logger.error(f"[{forum_id}] Alert: High persistent errors detected! ({job.error_count_persistent} errors)")
+                
             job.status = "completed"
         else:
             job.status = "failed"

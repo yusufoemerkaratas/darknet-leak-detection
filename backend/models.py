@@ -102,6 +102,10 @@ class CrawlJob(Base):
     total_records = Column(Integer, default=0)
     inserted_records = Column(Integer, default=0)
     duplicate_records = Column(Integer, default=0)
+    
+    error_count_transient = Column(Integer, default=0)
+    error_count_persistent = Column(Integer, default=0)
+    average_latency_ms = Column(Numeric(precision=12, scale=2), nullable=True)
 
     started_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     finished_at = Column(DateTime(timezone=True), nullable=True)
