@@ -169,7 +169,7 @@ function aggregateCompanies(findings) {
       if (right.count !== left.count) return right.count - left.count
       return right.score - left.score
     })
-    .slice(0, 5)
+    .slice(0, 10)
 }
 
 function mergeBackendStats(dashboardOverview, backendStats, companies) {
