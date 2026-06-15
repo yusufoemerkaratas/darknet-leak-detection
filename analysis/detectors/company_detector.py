@@ -96,8 +96,10 @@ class CompanyDetector:
                 self._profiles.append({
                     "name": name,
                     "name_lower": name.lower(),
+                    "name_pattern": self._compile_alias_pattern(name),
                     "aliases": alias_patterns,
                     "domains": [d.lower() for d in domains],
+                    "enable_fuzzy": profile.get("enable_fuzzy", True),
                 })
         except Exception:
             self._profiles = []
@@ -143,9 +145,11 @@ class CompanyDetector:
         text_lower = text.lower()
 
         try:
+            words = self._extract_words(text)
+
             for profile in self._profiles:
                 # ── Strategy 1: Exact match ──────────────────────
-                if profile["name_lower"] in text_lower:
+                if profile["name_pattern"].search(text):
                     results.append(CompanyResult(
                         company_name=profile["name"],
                         match_type="exact",
@@ -193,7 +197,9 @@ class CompanyDetector:
                     continue
 
                 # ── Strategy 4: Fuzzy match ──────────────────────
-                words = self._extract_words(text)
+                if not profile["enable_fuzzy"]:
+                    continue
+
                 best_score = 0.0
                 best_word = ""
 

@@ -15,6 +15,19 @@ def test_short_alias_does_not_match_inside_unrelated_words():
     assert detector.detect("systems maintenance report") == []
 
 
+def test_short_company_name_does_not_match_inside_unrelated_words():
+    detector = CompanyDetector(
+        [
+            {
+                "name": "ANS",
+                "enable_fuzzy": False,
+            }
+        ]
+    )
+
+    assert detector.detect("ransomware announce page") == []
+
+
 def test_company_alias_and_domain_still_match():
     detector = CompanyDetector(
         [

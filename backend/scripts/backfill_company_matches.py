@@ -63,7 +63,13 @@ def iter_candidate_record_ids(db, last_id=0, batch_size=100, include_known=False
     return [row.id for row in query.limit(batch_size).all()]
 
 
-def backfill_company_matches(limit=None, apply=False, include_known=False, batch_size=100):
+def backfill_company_matches(
+    limit=None,
+    apply=False,
+    include_known=False,
+    batch_size=100,
+    quiet=False,
+):
     engine = AnalysisEngine()
     db = SessionLocal()
     inspected = 0
@@ -106,7 +112,8 @@ def backfill_company_matches(limit=None, apply=False, include_known=False, batch
 
                 matched += 1
                 old_company_name = record.company.name if record.company else "Unknown"
-                print(f"{record.id}: {old_company_name} -> {best_company_name}")
+                if not quiet:
+                    print(f"{record.id}: {old_company_name} -> {best_company_name}")
 
                 if not apply:
                     continue
@@ -161,6 +168,11 @@ def parse_args():
         default=100,
         help="Number of records fetched per database batch.",
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Only print the final summary.",
+    )
     return parser.parse_args()
 
 
@@ -171,4 +183,5 @@ if __name__ == "__main__":
         apply=args.apply,
         include_known=args.include_known,
         batch_size=args.batch_size,
+        quiet=args.quiet,
     )

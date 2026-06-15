@@ -115,7 +115,17 @@ class AnalysisEngine:
         try:
             with profile_path.open("r", encoding="utf-8") as fh:
                 config = yaml.safe_load(fh) or {}
-            return config.get("companies", [])
+            profiles = config.get("companies", [])
+            if company_profile_path:
+                return profiles
+
+            generated_path = profile_path.with_name("company_profiles_generated.yaml")
+            if generated_path.exists():
+                with generated_path.open("r", encoding="utf-8") as fh:
+                    generated_config = yaml.safe_load(fh) or {}
+                profiles.extend(generated_config.get("companies", []))
+
+            return profiles
         except Exception:
             return []
 
