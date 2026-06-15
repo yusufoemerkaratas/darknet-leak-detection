@@ -41,6 +41,9 @@ function DashboardShell({
             onOpenSidebar={() => setSidebarOpen(true)}
             searchValue={searchValue}
             onSearchChange={onSearchChange}
+            showNotifications={false}
+            showProfile={false}
+            showThemeToggle={true}
           />
 
           <main className="flex-1 px-1 pb-1 pt-1.5 sm:px-1.5 xl:px-2">
