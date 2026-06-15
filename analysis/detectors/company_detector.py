@@ -6,10 +6,15 @@ exact match, domain match, alias match, and fuzzy match (Levenshtein ratio ≥ 0
 """
 
 import re
+from difflib import SequenceMatcher
 from dataclasses import dataclass
 from typing import Dict, List
 
-from Levenshtein import ratio as levenshtein_ratio
+try:
+    from Levenshtein import ratio as levenshtein_ratio
+except ImportError:  # pragma: no cover - environment fallback
+    def levenshtein_ratio(left: str, right: str) -> float:
+        return SequenceMatcher(None, left, right).ratio()
 
 
 @dataclass
@@ -99,11 +104,15 @@ class CompanyDetector:
 
     @staticmethod
     def _compile_alias_pattern(alias: str) -> re.Pattern:
-        """Compile alias as regex; fall back to literal match if invalid."""
-        try:
-            return re.compile(alias, re.IGNORECASE)
-        except re.error:
-            return re.compile(re.escape(alias), re.IGNORECASE)
+        """Compile alias as a safe literal whole-token pattern.
+
+        Alias entries in the company catalog are treated as literal strings,
+        not regular expressions. This avoids short aliases such as ``MS``
+        matching inside unrelated words like ``systems`` while still allowing
+        aliases containing punctuation such as ``Amazon.com`` or ``Micro$oft``.
+        """
+        escaped_alias = re.escape(alias.strip())
+        return re.compile(rf"(?<!\w){escaped_alias}(?!\w)", re.IGNORECASE)
 
     @staticmethod
     def _extract_words(text: str) -> List[str]:
