@@ -1,14 +1,16 @@
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+import json
+import os
 from typing import Literal, Optional
+from urllib import error, request
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, joinedload
 
-from analysis.llm_enrichment import LLMEnrichmentService
 from db import get_db
 from models import AnalysisResult, Company, LeakRecord, Source
 from schemas import (
@@ -787,9 +789,103 @@ def _build_llm_analysis_payload(record: LeakRecord) -> dict:
     }
 
 
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _extract_llm_text(payload: dict) -> str:
+    if isinstance(payload.get("response"), str):
+        return payload["response"]
+    if isinstance(payload.get("text"), str):
+        return payload["text"]
+    if isinstance(payload.get("output"), str):
+        return payload["output"]
+
+    choices = payload.get("choices")
+    if isinstance(choices, list) and choices:
+        first = choices[0]
+        if isinstance(first, dict):
+            if isinstance(first.get("text"), str):
+                return first["text"]
+            message = first.get("message")
+            if isinstance(message, dict) and isinstance(message.get("content"), str):
+                return message["content"]
+    return ""
+
+
+def _build_llm_prompt(text: str, analysis: dict) -> str:
+    return (
+        "You are assisting a data leak analyst. "
+        "Use the deterministic analysis result as the source of truth. "
+        "Do not change the score or classification. "
+        "Write one concise threat explanation in 2-3 sentences.\n\n"
+        f"Classification: {analysis.get('classification')}\n"
+        f"Risk score: {analysis.get('risk_score')}\n"
+        f"Classification rule: {analysis.get('classification_rule')}\n"
+        f"Matched companies: {analysis.get('matched_companies')}\n"
+        f"Detected patterns: {analysis.get('detected_patterns')}\n"
+        f"Terminology hits: {analysis.get('terminology_hits')}\n\n"
+        f"Leak text sample:\n{text[:2500]}"
+    )
+
+
+def _run_llm_enrichment(text: str, analysis: dict) -> dict:
+    if not _env_flag("LLM_ANALYSIS_ENABLED", False):
+        return {"status": "disabled", "explanation": None}
+
+    provider = os.environ.get("LLM_ANALYSIS_PROVIDER", "ollama").strip().lower()
+    endpoint_url = os.environ.get("LLM_ANALYSIS_URL", "http://localhost:9999/api/generate")
+    model = os.environ.get("LLM_ANALYSIS_MODEL", "llama3.1")
+    api_key = os.environ.get("LLM_ANALYSIS_API_KEY")
+    try:
+        timeout = max(int(os.environ.get("LLM_ANALYSIS_TIMEOUT", "30")), 1)
+    except ValueError:
+        timeout = 30
+
+    prompt = _build_llm_prompt(text, analysis)
+    if provider in {"github-models", "openai-compatible"}:
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You generate concise data leak threat explanations.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+        }
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+        }
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+    else:
+        payload = {"model": model, "prompt": prompt, "stream": False}
+        headers = {"Content-Type": "application/json"}
+
+    try:
+        body = json.dumps(payload).encode("utf-8")
+        req = request.Request(endpoint_url, data=body, headers=headers, method="POST")
+        with request.urlopen(req, timeout=timeout) as response:
+            response_payload = json.loads(response.read().decode("utf-8"))
+        explanation = " ".join(_extract_llm_text(response_payload).strip().split())
+        if not explanation:
+            return {"status": "empty", "explanation": None}
+        return {"status": "ok", "model": model, "explanation": explanation}
+    except error.HTTPError as exc:
+        return {"status": "error", "explanation": None, "error": f"HTTP {exc.code}"}
+    except Exception as exc:
+        return {"status": "error", "explanation": None, "error": str(exc)}
+
+
 def _run_and_store_llm_analysis(record: LeakRecord) -> None:
     patterns = _get_detected_patterns(record)
-    enrichment = LLMEnrichmentService().enrich(
+    enrichment = _run_llm_enrichment(
         _build_llm_analysis_text(record),
         _build_llm_analysis_payload(record),
     )
