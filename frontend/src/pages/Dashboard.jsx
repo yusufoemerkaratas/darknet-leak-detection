@@ -31,7 +31,7 @@ import {
 } from '../api/client'
 import { severityTheme } from '../styles/theme'
 
-const ITEMS_PER_PAGE = 3
+const ITEMS_PER_PAGE = 5
 const REFRESH_INTERVAL_MS = 30000
 const TIMELINE_RANGE_LABELS = {
   '7d': 'last 7 days',
@@ -65,11 +65,6 @@ function findingMatchesSearch(finding, searchTerm) {
     .includes(searchTerm)
 }
 
-function feedMatchesSearch(item, searchTerm) {
-  if (!searchTerm) return true
-
-  return [item.title, item.company, item.time].join(' ').toLowerCase().includes(searchTerm)
-}
 
 function isResolvedStatus(status) {
   return status === 'Reviewed' || status === 'False Positive'
@@ -392,7 +387,6 @@ function Dashboard() {
   }, [timelineRange])
 
   const findings = dashboardData?.findings ?? []
-  const liveFeed = dashboardData?.live_feed ?? []
   const timelineData = dashboardData?.timeline ?? []
   const dataSources = dashboardData?.data_sources ?? []
   const criticalAlertsData = dashboardData?.critical_alerts ?? []
@@ -513,10 +507,14 @@ function Dashboard() {
     .sort((left, right) => right.riskScore - left.riskScore)
     .slice(0, 3)
   const alertSource = criticalAlertsData.length > 0 ? criticalAlertsData : criticalAlerts
-  const visibleAlerts = alertSource.filter((alert) =>
-    findingMatchesSearch(alert, normalizedSearchTerm)
-  )
-  const visibleLiveFeed = liveFeed.filter((item) => feedMatchesSearch(item, normalizedSearchTerm))
+  const visibleAlerts = alertSource.filter((alert) => {
+    const searchMatch = findingMatchesSearch(alert, normalizedSearchTerm)
+    const companyMatch = companyFilter === 'All Companies' || alert.company === companyFilter
+    const severityMatch = severityFilter === 'All Severity' || alert.severity === severityFilter
+    const statusMatch = statusFilter === 'All Status' || alert.status === statusFilter
+    return searchMatch && companyMatch && severityMatch && statusMatch
+  })
+
   const visibleSummary = hasActiveFilterContext
     ? {
         total_findings: filteredFindings.length,
@@ -768,7 +766,13 @@ function Dashboard() {
 
   const rightPanel = (
     <>
-      <LiveMonitoringFeed items={visibleLiveFeed} searchValue={searchValue} />
+      <StatusCard
+        id="companies"
+        subtitle="Companies with the highest current leak pressure."
+        title="Top Affected Companies"
+      >
+        <CompaniesBarChart companies={topCompanies} />
+      </StatusCard>
       <SeverityLegend items={severityLegend} />
       <DataSourcesCard items={dataSources} />
       <DetectionEngineStatus
@@ -886,7 +890,7 @@ function Dashboard() {
 
       <SourceManagementPanel />
 
-      <section className="grid gap-3 xl:grid-cols-3" id="visualizations">
+      <section className="grid gap-3 xl:grid-cols-2" id="visualizations">
         <StatusCard
           subtitle="Distribution of findings by risk level."
           title="Findings by Severity"
@@ -925,26 +929,7 @@ function Dashboard() {
         >
           <FindingsLineChart data={visibleTimelineData} />
         </StatusCard>
-
-        <StatusCard
-          id="companies"
-          subtitle="Companies with the highest current leak pressure."
-          title="Top Affected Companies"
-        >
-          <CompaniesBarChart companies={topCompanies} />
-        </StatusCard>
       </section>
-
-      <StatusCard
-        id="settings"
-        subtitle="Operational dashboard preferences and integrations will be expanded here."
-        title="Settings"
-      >
-        <div className="rounded-[12px] border border-slate-800/80 bg-slate-950/45 px-3 py-3 text-[12px] text-slate-400">
-          Current dashboard settings use the existing environment configuration and backend
-          health endpoints. No additional frontend settings are required for this fix.
-        </div>
-      </StatusCard>
 
       {isReportOpen ? (
         <ReportModal

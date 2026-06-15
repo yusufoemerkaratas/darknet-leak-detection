@@ -1,41 +1,41 @@
 export const severityTheme = {
   Critical: {
-    badge: 'border border-rose-500/25 bg-rose-500/12 text-rose-200',
-    dot: 'bg-rose-400',
-    score: 'border border-rose-500/25 bg-rose-500/12 text-rose-200',
+    badge: 'border border-[var(--badge-critical-border)] bg-[var(--badge-critical-bg)] text-[var(--badge-critical-text)]',
+    dot: 'bg-[var(--badge-critical-dot)]',
+    score: 'border border-[var(--badge-critical-border)] bg-[var(--badge-critical-bg)] text-[var(--badge-critical-text)]',
     chart: '#ef4444',
   },
   High: {
-    badge: 'border border-orange-500/25 bg-orange-500/12 text-orange-200',
-    dot: 'bg-orange-400',
-    score: 'border border-orange-500/25 bg-orange-500/12 text-orange-200',
+    badge: 'border border-[var(--badge-high-border)] bg-[var(--badge-high-bg)] text-[var(--badge-high-text)]',
+    dot: 'bg-[var(--badge-high-dot)]',
+    score: 'border border-[var(--badge-high-border)] bg-[var(--badge-high-bg)] text-[var(--badge-high-text)]',
     chart: '#f97316',
   },
   Medium: {
-    badge: 'border border-amber-500/25 bg-amber-500/12 text-amber-200',
-    dot: 'bg-amber-400',
-    score: 'border border-amber-500/25 bg-amber-500/12 text-amber-200',
+    badge: 'border border-[var(--badge-medium-border)] bg-[var(--badge-medium-bg)] text-[var(--badge-medium-text)]',
+    dot: 'bg-[var(--badge-medium-dot)]',
+    score: 'border border-[var(--badge-medium-border)] bg-[var(--badge-medium-bg)] text-[var(--badge-medium-text)]',
     chart: '#f59e0b',
   },
   Low: {
-    badge: 'border border-emerald-500/25 bg-emerald-500/12 text-emerald-200',
-    dot: 'bg-emerald-400',
-    score: 'border border-emerald-500/25 bg-emerald-500/12 text-emerald-200',
+    badge: 'border border-[var(--badge-low-border)] bg-[var(--badge-low-bg)] text-[var(--badge-low-text)]',
+    dot: 'bg-[var(--badge-low-dot)]',
+    score: 'border border-[var(--badge-low-border)] bg-[var(--badge-low-bg)] text-[var(--badge-low-text)]',
     chart: '#34d399',
   },
   Info: {
-    badge: 'border border-sky-500/25 bg-sky-500/12 text-sky-200',
-    dot: 'bg-sky-400',
-    score: 'border border-sky-500/25 bg-sky-500/12 text-sky-200',
+    badge: 'border border-[var(--badge-info-border)] bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]',
+    dot: 'bg-[var(--badge-info-dot)]',
+    score: 'border border-[var(--badge-info-border)] bg-[var(--badge-info-bg)] text-[var(--badge-info-text)]',
     chart: '#38bdf8',
   },
 }
 
 export const statusTheme = {
-  'Not Reviewed': 'border border-amber-500/20 bg-amber-500/10 text-amber-200',
-  Reviewed: 'border border-emerald-500/20 bg-emerald-500/10 text-emerald-200',
-  'False Positive': 'border border-sky-500/20 bg-sky-500/10 text-sky-200',
-  Escalated: 'border border-fuchsia-500/20 bg-fuchsia-500/10 text-fuchsia-200',
+  'Not Reviewed': 'border border-[var(--status-not-reviewed-border)] bg-[var(--status-not-reviewed-bg)] text-[var(--status-not-reviewed-text)]',
+  Reviewed: 'border border-[var(--status-reviewed-border)] bg-[var(--status-reviewed-bg)] text-[var(--status-reviewed-text)]',
+  'False Positive': 'border border-[var(--status-false-positive-border)] bg-[var(--status-false-positive-bg)] text-[var(--status-false-positive-text)]',
+  Escalated: 'border border-[var(--status-escalated-border)] bg-[var(--status-escalated-bg)] text-[var(--status-escalated-text)]',
 }
 
 export function getSeverityTheme(severity) {
