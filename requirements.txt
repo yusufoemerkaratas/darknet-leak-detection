@@ -10,8 +10,9 @@ certifi==2026.2.25
 
 # Scraping
 beautifulsoup4==4.14.3
-lxml==6.0.2
-Scrapy==2.14.2
+lxml==6.1.1
+Scrapy==2.16.0
+Twisted==26.4.0
 selenium==4.41.0
 playwright==1.58.0
 
@@ -35,7 +36,7 @@ schedule==1.2.2
 chardet==5.2.0
 
 # Testing
-pytest==8.3.4
+pytest==9.0.3
 
 # Database
 SQLAlchemy==2.0.49
