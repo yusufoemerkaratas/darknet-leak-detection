@@ -1,6 +1,8 @@
-FROM python:3.11-slim
+# Includes Python, Playwright system dependencies, and preinstalled browsers.
+# Keep this tag aligned with the playwright version in requirements.txt.
+FROM mcr.microsoft.com/playwright/python:v1.58.0-noble
 
-# System deps for Playwright, lxml, psycopg2
+# Build/runtime deps used by lxml and database packages.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
@@ -11,22 +13,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy entire project (collector imports from backend/ and analysis/)
-COPY . /app
+# Install CPU-only Torch first so the generic requirements install does not pull
+# CUDA/NVIDIA wheels into the collector image.
+ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir --index-url "$TORCH_INDEX_URL" "torch>=2.6.0"
 
-# Install collector dependencies
+# Install project dependencies.
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install backend dependencies needed by ingestion_pipeline
-RUN pip install --no-cache-dir \
-    fastapi \
-    uvicorn \
-    alembic \
-    pydantic \
-    python-multipart
-
-# Install Playwright browsers (needed for SPA/darknet forum collection)
-RUN pip install --no-cache-dir playwright && playwright install --with-deps chromium
+# Copy runtime code after dependency installation so source changes reuse cached deps.
+COPY analysis ./analysis
+COPY backend ./backend
+COPY collectors ./collectors
 
 WORKDIR /app/collectors
 

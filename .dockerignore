@@ -1,0 +1,46 @@
+# Git
+.git
+.gitignore
+.gitlab-ci.yml
+.agents/
+.codex/
+
+# Environments
+venv
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.eggs/
+
+# Node
+node_modules/
+npm-debug.log
+
+# OS
+.DS_Store
+
+# Volumes / Data
+postgres_data/
+collectors/raw_storage/
+collectors/processed_storage/
+collectors/failed_storage/
+.cache/
+
+# Files not needed by the collector image build context
+docs/
+frontend/
+tor/
+README.md
+CHANGELOG.md
+CLAUDE.md
+requirements-dev.txt

@@ -2,8 +2,6 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-COPY . /app
-
 RUN pip install --no-cache-dir \
     fastapi \
     uvicorn[standard] \
@@ -13,6 +11,8 @@ RUN pip install --no-cache-dir \
     alembic \
     pydantic \
     python-multipart
+
+COPY . /app
 
 EXPOSE 8000
 
