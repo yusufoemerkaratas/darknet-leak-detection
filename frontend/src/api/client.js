@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api'
+import { normalizeSeverityLabel } from "../styles/theme";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 export async function apiRequest(endpoint, options = {}) {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -9,7 +11,7 @@ export async function apiRequest(endpoint, options = {}) {
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`)
+    throw new Error(`API request failed: ${response.status}`);
   }
 
   return response.json();
@@ -34,33 +36,33 @@ function mapFinding(finding) {
     id: finding.id,
     company: finding.company,
     type: finding.type,
-    severity: finding.severity,
+    severity: normalizeSeverityLabel(finding.severity, finding.risk_score),
     riskScore: finding.risk_score,
     status: finding.status,
     detectedAt: finding.detected_at,
     source: finding.source,
     affected: finding.affected,
-  }
+  };
 }
 
 function mapLLMExplanation(explanation, fallbackSummary) {
   if (!explanation) {
     return {
-      status: 'unavailable',
+      status: "unavailable",
       text: fallbackSummary,
-      source: 'deterministic-fallback',
+      source: "deterministic-fallback",
       isAvailable: false,
-      fallbackReason: 'LLM explanation metadata is not available.',
-    }
+      fallbackReason: "LLM explanation metadata is not available.",
+    };
   }
 
   return {
-    status: explanation.status ?? 'unavailable',
+    status: explanation.status ?? "unavailable",
     text: explanation.text ?? fallbackSummary,
-    source: explanation.source ?? 'deterministic-fallback',
+    source: explanation.source ?? "deterministic-fallback",
     isAvailable: Boolean(explanation.is_available),
-    fallbackReason: explanation.fallback_reason ?? '',
-  }
+    fallbackReason: explanation.fallback_reason ?? "",
+  };
 }
 
 function mapFindingDetail(finding) {
@@ -73,90 +75,98 @@ function mapFindingDetail(finding) {
     rawUrl: finding.raw_url,
     publishedAt: finding.published_at,
     evidence: finding.evidence ?? [],
-  }
-}
-
-function normalizeSeverityLabel(label) {
-  if (!label) return 'Info'
-
-  const normalized = String(label).toLowerCase()
-  if (normalized === 'critical') return 'Critical'
-  if (normalized === 'high') return 'High'
-  if (normalized === 'medium') return 'Medium'
-  if (normalized === 'low') return 'Low'
-  return 'Info'
+  };
 }
 
 function mapSeverityBreakdown(breakdown) {
-  return Object.entries(breakdown ?? {}).map(([label, value]) => ({
-    label: normalizeSeverityLabel(label),
+  const counts = Object.entries(breakdown ?? {}).reduce(
+    (accumulator, [label, value]) => {
+      const normalizedLabel = normalizeSeverityLabel(label);
+      accumulator[normalizedLabel] =
+        (accumulator[normalizedLabel] ?? 0) + Number(value ?? 0);
+      return accumulator;
+    },
+    {},
+  );
+
+  return Object.entries(counts).map(([label, value]) => ({
+    label,
     value,
-  }))
+  }));
 }
 
-export async function getDashboardOverview(timelineRange = '7d') {
-  const query = new URLSearchParams({ timeline_range: timelineRange }).toString()
-  const data = await get(`/dashboard/overview?${query}`)
+export async function getDashboardOverview(timelineRange = "7d") {
+  const query = new URLSearchParams({
+    timeline_range: timelineRange,
+  }).toString();
+  const data = await get(`/dashboard/overview?${query}`);
 
   return {
     ...data,
     findings: (data.findings ?? []).map(mapFinding),
     critical_alerts: (data.critical_alerts ?? []).map(mapFinding),
-  }
+  };
 }
 
 export async function getDashboardBackendStats(days = 30) {
-  const query = new URLSearchParams({ days: String(days) }).toString()
+  const query = new URLSearchParams({ days: String(days) }).toString();
   const [overview, findingsByDay, alertsBySeverity] = await Promise.all([
-    get('/stats/overview'),
+    get("/stats/overview"),
     get(`/stats/findings-by-day?${query}`),
-    get('/stats/alerts-by-severity'),
-  ])
+    get("/stats/alerts-by-severity"),
+  ]);
 
   return {
     overview,
     findingsByDay,
     alertsBySeverity: mapSeverityBreakdown(alertsBySeverity),
-  }
+  };
 }
 
 export async function getCompanies() {
-  return get('/companies')
+  return get("/companies");
 }
 
 export async function getFindingDetail(findingId) {
-  const data = await get(`/dashboard/findings/${findingId}`)
-  return mapFindingDetail(data)
+  const data = await get(`/dashboard/findings/${findingId}`);
+  return mapFindingDetail(data);
 }
 
 export async function updateFindingStatus(findingId, status) {
-  const data = await patch(`/dashboard/findings/${findingId}/status`, { status })
-  return mapFindingDetail(data)
+  const data = await patch(`/dashboard/findings/${findingId}/status`, {
+    status,
+  });
+  return mapFindingDetail(data);
 }
 
 export async function analyzeFindingWithLLM(findingId) {
-  const data = await post(`/dashboard/findings/${findingId}/llm-analysis`)
-  return mapFindingDetail(data)
+  const data = await post(`/dashboard/findings/${findingId}/llm-analysis`);
+  return mapFindingDetail(data);
 }
 
 export async function getSources(filters = {}) {
-  const query = new URLSearchParams()
+  const query = new URLSearchParams();
 
-  if (filters.name) query.set('name', filters.name)
-  if (typeof filters.isActive === 'boolean') query.set('is_active', String(filters.isActive))
+  if (filters.name) query.set("name", filters.name);
+  if (typeof filters.isActive === "boolean")
+    query.set("is_active", String(filters.isActive));
 
-  const suffix = query.toString() ? `?${query.toString()}` : ''
-  return get(`/sources${suffix}`)
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return get(`/sources${suffix}`);
 }
 
-export const createSource = (source) => post('/sources', source)
+export const createSource = (source) => post("/sources", source);
 
-export const updateSource = (sourceId, source) => patch(`/sources/${sourceId}`, source)
+export const updateSource = (sourceId, source) =>
+  patch(`/sources/${sourceId}`, source);
 
-export const toggleSource = (sourceId) => patch(`/sources/${sourceId}/toggle`, {})
+export const toggleSource = (sourceId) =>
+  patch(`/sources/${sourceId}/toggle`, {});
 
-export const getSourceHealth = (sourceId) => get(`/sources/${sourceId}/health`)
+export const getSourceHealth = (sourceId) => get(`/sources/${sourceId}/health`);
 
-export const getSourceMetrics = (sourceId) => get(`/sources/${sourceId}/metrics`)
+export const getSourceMetrics = (sourceId) =>
+  get(`/sources/${sourceId}/metrics`);
 
-export const testSourceCrawl = (sourceId) => post(`/sources/${sourceId}/test-crawl`)
+export const testSourceCrawl = (sourceId) =>
+  post(`/sources/${sourceId}/test-crawl`);
