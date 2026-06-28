@@ -1,42 +1,63 @@
-import { useState } from 'react'
-import Sidebar from './Sidebar'
-import Topbar from './Topbar'
+import { useState } from "react";
+import Sidebar from "./Sidebar";
+import Topbar from "./Topbar";
 
 function DashboardShell({
   activeItem,
   onSelectItem,
   children,
   rightPanel,
+  detectionEngine,
   searchValue,
   onSearchChange,
-  sidebarStatusCards,
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleSelect = (itemId) => {
-    onSelectItem?.(itemId)
-    setSidebarOpen(false)
-  }
+    onSelectItem?.(itemId);
+    setSidebarOpen(false);
+  };
 
   return (
-    <div className="relative min-h-screen overflow-hidden" style={{ background: 'var(--lg-body-bg)', color: 'var(--lg-text)' }}>
+    <div
+      className="relative min-h-screen overflow-hidden"
+      style={{ background: "var(--lg-body-bg)", color: "var(--lg-text)" }}
+    >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-[320px] bg-[radial-gradient(circle_at_top,rgba(79,70,229,0.18),transparent_54%)]" />
-        <div className="absolute -left-24 top-24 h-72 w-72 rounded-full bg-blue-500/8 blur-3xl" />
-        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-fuchsia-500/6 blur-3xl" />
-        <div className="grid-fade absolute inset-0 opacity-25" />
+        <div className="stellar-field absolute inset-0" />
+        <div className="stellar-dust absolute inset-0" />
+        <div
+          className="absolute inset-x-0 top-0 h-[300px]"
+          style={{
+            background:
+              "radial-gradient(circle at top, rgba(110, 168, 215, 0.14), transparent 56%)",
+          }}
+        />
+        <div
+          className="stellar-cloud absolute -left-24 top-24 h-72 w-72 rounded-full blur-3xl"
+          style={{ background: "rgba(110, 168, 215, 0.08)" }}
+        />
+        <div
+          className="stellar-cloud absolute bottom-0 right-0 h-80 w-80 rounded-full blur-3xl"
+          style={{ background: "rgba(152, 179, 201, 0.07)" }}
+        />
+        <div
+          className="stellar-cloud absolute right-[18%] top-[18%] h-52 w-52 rounded-full blur-3xl"
+          style={{ background: "rgba(141, 119, 173, 0.06)" }}
+        />
+        <div className="grid-fade absolute inset-0 opacity-20" />
       </div>
 
-      <div className="relative mx-auto flex min-h-screen w-full max-w-[1720px] px-3 py-3 xl:px-4 xl:py-4">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-[1680px] px-3 py-3 xl:px-4 xl:py-4">
         <Sidebar
           activeItem={activeItem}
+          detectionEngine={detectionEngine}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           onSelectItem={handleSelect}
-          statusCards={sidebarStatusCards}
         />
 
-        <div className="flex min-w-0 flex-1 flex-col xl:pl-[230px]">
+        <div className="flex min-w-0 flex-1 flex-col xl:pl-[224px]">
           <Topbar
             onOpenSidebar={() => setSidebarOpen(true)}
             searchValue={searchValue}
@@ -47,7 +68,7 @@ function DashboardShell({
           />
 
           <main className="flex-1 px-1 pb-1 pt-1.5 sm:px-1.5 xl:px-2">
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px] 2xl:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_250px] 2xl:grid-cols-[minmax(0,1fr)_270px]">
               <section className="min-w-0 space-y-3">{children}</section>
               <aside className="min-w-0 space-y-3">{rightPanel}</aside>
             </div>
@@ -55,7 +76,7 @@ function DashboardShell({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default DashboardShell
+export default DashboardShell;
