@@ -138,6 +138,8 @@ class Alert(Base):
 
     is_reviewed = Column(Boolean, default=False, nullable=False)
 
+    review_notes = Column(Text, nullable=True)
+
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),

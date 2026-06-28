@@ -1,12 +1,17 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 
 from db import SessionLocal
 from models import Alert, AnalysisResult, Company, LeakRecord
+
+
+class ReviewBody(BaseModel):
+    review_notes: str | None = None
 
 router = APIRouter(prefix="/findings", tags=["findings"])
 alert_router = APIRouter(tags=["alerts"])
@@ -30,6 +35,9 @@ def _serialize_alert(alert: Alert) -> dict:
         "severity": alert.severity,
         "company": alert.company.name if alert.company else None,
         "is_reviewed": alert.is_reviewed,
+        "review_notes": alert.review_notes,
+        "risk_score": alert.leak_record.risk_score if alert.leak_record else 0,
+        "classification": alert.leak_record.classification if alert.leak_record else None,
         "created_at": alert.created_at,
     }
 
@@ -108,17 +116,14 @@ def _findings_by_severity(db: Session) -> dict:
         db.query(LeakRecord)
         .filter(
             LeakRecord.risk_score >= 75,
-            LeakRecord.risk_score <= 89,
+            LeakRecord.risk_score < 90,
         )
         .count()
     )
 
     low = (
         db.query(LeakRecord)
-        .filter(
-            LeakRecord.risk_score >= 60,
-            LeakRecord.risk_score <= 74,
-        )
+        .filter(LeakRecord.risk_score < 75)
         .count()
     )
 
@@ -172,6 +177,8 @@ def _stats_overview(db: Session) -> dict:
 
 
 def _findings_by_day(db: Session, days: int) -> list[dict]:
+    from datetime import date as date_type
+    today    = datetime.now(timezone.utc).date()
     start_at = datetime.now(timezone.utc) - timedelta(days=days)
 
     rows = (
@@ -185,13 +192,16 @@ def _findings_by_day(db: Session, days: int) -> list[dict]:
         .all()
     )
 
-    return [
-        {
-            "date": str(row.date),
-            "findings": row.findings,
-        }
-        for row in rows
-    ]
+    # Build a lookup so every day in the range gets a value (0 for missing days)
+    counts: dict[str, int] = {str(row.date): row.findings for row in rows}
+
+    result = []
+    for i in range(days):
+        d = today - timedelta(days=days - 1 - i)
+        key = str(d)
+        result.append({"date": key, "findings": counts.get(key, 0)})
+
+    return result
 
 
 def _alerts_by_severity(db: Session) -> dict:
@@ -214,6 +224,7 @@ def list_findings(
     severity: str | None = None,
     min_score: int | None = None,
     is_reviewed: bool | None = None,
+    is_false_positive: bool | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     sort_by: str = Query(default="timestamp", pattern="^(score|timestamp)$"),
@@ -244,6 +255,11 @@ def list_findings(
     if is_reviewed is not None:
         query = query.filter(
             LeakRecord.is_reviewed == is_reviewed
+        )
+
+    if is_false_positive is not None:
+        query = query.filter(
+            LeakRecord.is_false_positive == is_false_positive
         )
 
     if date_from is not None:
@@ -335,6 +351,34 @@ def list_alerts_root(
     )
 
 
+@router.patch("/alerts/{alert_id}/review")
+def review_alert(alert_id: int, body: ReviewBody = Body(default=ReviewBody()), db: Session = Depends(get_db)):
+    alert = db.query(Alert).options(
+        joinedload(Alert.leak_record), joinedload(Alert.company)
+    ).filter(Alert.id == alert_id).first()
+    if not alert:
+        return {"error": "Alert not found"}
+    alert.is_reviewed = True
+    alert.review_notes = body.review_notes
+    db.commit()
+    db.refresh(alert)
+    return _serialize_alert(alert)
+
+
+@router.patch("/alerts/{alert_id}/reset")
+def reset_alert(alert_id: int, db: Session = Depends(get_db)):
+    alert = db.query(Alert).options(
+        joinedload(Alert.leak_record), joinedload(Alert.company)
+    ).filter(Alert.id == alert_id).first()
+    if not alert:
+        return {"error": "Alert not found"}
+    alert.is_reviewed = False
+    alert.review_notes = None
+    db.commit()
+    db.refresh(alert)
+    return _serialize_alert(alert)
+
+
 @stats_router.get("/stats/overview")
 def stats_overview(
     db: Session = Depends(get_db),
@@ -384,6 +428,7 @@ def get_finding_detail(
     "classification": finding.classification,
     "risk_score": finding.risk_score,
     "severity": finding.severity,
+    "raw_url": finding.raw_url,
     "created_at": finding.collected_at,
     "analysis_result": _serialize_analysis_result(finding.analysis_result),
     "is_reviewed": finding.is_reviewed,
@@ -395,7 +440,7 @@ def get_finding_detail(
 @router.patch("/{finding_id}/review")
 def mark_finding_reviewed(
     finding_id: int,
-    review_notes: str | None = None,
+    body: ReviewBody = Body(default_factory=ReviewBody),
     db: Session = Depends(get_db),
 ):
     finding = (
@@ -409,8 +454,8 @@ def mark_finding_reviewed(
 
     finding.is_reviewed = True
 
-    if review_notes:
-        finding.review_notes = review_notes
+    if body.review_notes:
+        finding.review_notes = body.review_notes
 
     db.commit()
     db.refresh(finding)
@@ -418,14 +463,41 @@ def mark_finding_reviewed(
     return {
         "id": finding.id,
         "is_reviewed": True,
-        "review_notes": review_notes,
+        "review_notes": finding.review_notes,
+    }
+
+
+@router.patch("/{finding_id}/reset")
+def reset_finding_status(
+    finding_id: int,
+    db: Session = Depends(get_db),
+):
+    finding = (
+        db.query(LeakRecord)
+        .filter(LeakRecord.id == finding_id)
+        .first()
+    )
+
+    if not finding:
+        return {"error": "Finding not found"}
+
+    finding.is_reviewed = False
+    finding.is_false_positive = False
+
+    db.commit()
+    db.refresh(finding)
+
+    return {
+        "id": finding.id,
+        "is_reviewed": False,
+        "is_false_positive": False,
+        "review_notes": finding.review_notes,
     }
 
 
 @router.patch("/{finding_id}/false-positive")
 def mark_false_positive(
     finding_id: int,
-    review_notes: str,
     db: Session = Depends(get_db),
 ):
     finding = (
@@ -439,7 +511,6 @@ def mark_false_positive(
 
     finding.is_false_positive = True
     finding.is_reviewed = True
-    finding.review_notes = review_notes
 
     db.commit()
     db.refresh(finding)
@@ -447,7 +518,7 @@ def mark_false_positive(
     return {
         "id": finding.id,
         "is_false_positive": True,
-        "review_notes": review_notes,
+        "review_notes": finding.review_notes,
     }
 
 

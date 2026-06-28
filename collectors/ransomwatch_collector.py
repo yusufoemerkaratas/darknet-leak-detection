@@ -65,10 +65,14 @@ class RansomwatchCollector:
     to the standard collector document format used by ingestion_pipeline.
     """
 
-    def __init__(self, timeout: int = 30):
+    def __init__(self, timeout: int = 60):
         self.timeout = timeout
         self._session = requests.Session()
         self._session.headers["User-Agent"] = _UA
+        self._session.proxies = {
+            "http":  "socks5h://tor:9050",
+            "https": "socks5h://tor:9050",
+        }
 
     def _fetch(self) -> Optional[list]:
         try:
@@ -154,4 +158,4 @@ if __name__ == "__main__":
     c = RansomwatchCollector()
     result = c.run()
     c.close()
-    print(f"\nSonuç: {result}")
+    print(f"\nResult: {result}")

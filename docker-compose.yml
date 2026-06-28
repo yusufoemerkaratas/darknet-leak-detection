@@ -86,6 +86,7 @@ services:
     env_file:
       - .env
     volumes:
+      - ./collectors/config:/app/collectors/config
       - collector_raw:/app/collectors/raw_storage
       - collector_processed:/app/collectors/processed_storage
       - collector_failed:/app/collectors/failed_storage
