@@ -1,6 +1,6 @@
-import { AlertOctagon } from 'lucide-react'
-import StatusCard from '../cards/StatusCard'
-import { getSeverityTheme } from '../../styles/theme'
+import { AlertOctagon } from "lucide-react";
+import StatusCard from "../cards/StatusCard";
+import { getSeverityTheme } from "../../styles/theme";
 
 function LatestCriticalAlerts({ alerts, onViewAll, searchValue }) {
   return (
@@ -8,24 +8,24 @@ function LatestCriticalAlerts({ alerts, onViewAll, searchValue }) {
       actionLabel="View All Alerts"
       id="alerts"
       onAction={onViewAll}
-      subtitle="Newest high-risk findings requiring immediate review."
+      subtitle="Priority findings that may require immediate analyst review."
       title="Latest Critical Alerts"
     >
       <div className="space-y-1.5">
         {alerts.length === 0 ? (
-          <div className="rounded-[9px] border border-dashed border-slate-800 bg-slate-950/35 px-3 py-3 text-[11px] text-slate-400">
+          <div className="surface-subtle rounded-[9px] border border-dashed border-slate-800 px-3 py-3 text-[11px] text-slate-400">
             {searchValue?.trim()
-              ? `No critical alerts matched "${searchValue.trim()}".`
-              : 'No critical alerts available right now.'}
+              ? `No critical alerts match "${searchValue.trim()}".`
+              : "No critical alerts are currently awaiting review."}
           </div>
         ) : null}
 
         {alerts.map((alert) => {
-          const theme = getSeverityTheme(alert.severity)
+          const theme = getSeverityTheme(alert.severity);
 
           return (
             <div
-              className="data-row grid gap-1.5 rounded-[9px] border border-slate-800/80 bg-slate-950/45 px-2 py-1.5 xl:grid-cols-[minmax(0,1fr)_64px_84px] xl:items-center"
+              className="data-row surface-subtle grid gap-1.5 rounded-[9px] border border-slate-800/80 px-2 py-1.5 xl:grid-cols-[minmax(0,1fr)_64px_84px] xl:items-center"
               key={alert.id}
             >
               <div className="flex min-w-0 items-start gap-2">
@@ -35,7 +35,10 @@ function LatestCriticalAlerts({ alerts, onViewAll, searchValue }) {
 
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <p className="font-display text-[12px] font-semibold text-white">
+                    <p
+                      className="font-display text-[11.5px] font-semibold"
+                      style={{ color: "var(--lg-text)" }}
+                    >
                       {alert.company}
                     </p>
                     <span
@@ -52,8 +55,11 @@ function LatestCriticalAlerts({ alerts, onViewAll, searchValue }) {
                 </div>
               </div>
 
-              <div className="rounded-md border border-slate-800 bg-slate-950/80 px-1.5 py-1 text-center">
-                <p className="font-display text-[0.95rem] font-semibold text-rose-200">
+              <div className="surface-elevated rounded-md border border-slate-800 px-1.5 py-1 text-center">
+                <p
+                  className="font-display text-[0.95rem] font-semibold"
+                  style={{ color: "var(--lg-danger)" }}
+                >
                   {alert.riskScore}
                 </p>
                 <p className="text-[8px] uppercase tracking-[0.14em] text-slate-500">
@@ -61,15 +67,15 @@ function LatestCriticalAlerts({ alerts, onViewAll, searchValue }) {
                 </p>
               </div>
 
-              <div className="rounded-md border border-slate-800 bg-slate-950/80 px-2 py-1 text-right">
+              <div className="surface-elevated rounded-md border border-slate-800 px-2 py-1 text-right">
                 <p className="text-[10px] text-slate-300">{alert.detectedAt}</p>
               </div>
             </div>
-          )
+          );
         })}
       </div>
     </StatusCard>
-  )
+  );
 }
 
-export default LatestCriticalAlerts
+export default LatestCriticalAlerts;
