@@ -1,29 +1,37 @@
 function CompaniesBarChart({ companies }) {
-  const maxCount = Math.max(...companies.map((company) => company.count), 1)
+  const maxCount = Math.max(...companies.map((company) => company.count), 1);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       {companies.map((company) => (
-        <div className="space-y-2" key={company.name}>
-          <div className="flex items-center justify-between gap-4 text-sm">
-            <span className="text-slate-200">{company.name}</span>
-            <span className="text-slate-500">
+        <div className="space-y-1.5" key={company.name}>
+          <div className="flex items-center justify-between gap-4 text-[11px]">
+            <span className="font-medium" style={{ color: "var(--lg-text)" }}>
+              {company.name}
+            </span>
+            <span style={{ color: "var(--lg-muted)" }}>
               {company.count} findings • Score {company.score}
             </span>
           </div>
-          <div className="h-2.5 rounded-full bg-slate-900/80">
+          <div
+            className="h-1.5 rounded-full"
+            style={{
+              background: "var(--lg-chart-track)",
+              boxShadow: "inset 0 1px 1px rgba(15, 23, 42, 0.12)",
+            }}
+          >
             <div
               className="h-full rounded-full"
               style={{
                 width: `${(company.count / maxCount) * 100}%`,
-                background: `linear-gradient(90deg, ${company.color}, rgba(255,255,255,0.7))`,
+                background: company.color,
               }}
             />
           </div>
         </div>
       ))}
     </div>
-  )
+  );
 }
 
-export default CompaniesBarChart
+export default CompaniesBarChart;

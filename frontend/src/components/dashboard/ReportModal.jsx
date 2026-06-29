@@ -1,11 +1,11 @@
-import { useState } from 'react'
-import { AlertTriangle, Download, ShieldCheck, Users, X } from 'lucide-react'
-import FindingsLineChart from '../charts/FindingsLineChart'
-import SeverityDonutChart from '../charts/SeverityDonutChart'
-import CompaniesBarChart from '../charts/CompaniesBarChart'
-import TimelineRangeSelector from './TimelineRangeSelector'
+import { useState } from "react";
+import { AlertTriangle, Download, ShieldCheck, Users, X } from "lucide-react";
+import FindingsLineChart from "../charts/FindingsLineChart";
+import SeverityDonutChart from "../charts/SeverityDonutChart";
+import CompaniesBarChart from "../charts/CompaniesBarChart";
+import TimelineRangeSelector from "./TimelineRangeSelector";
 
-const FINDINGS_PAGE_SIZE = 6
+const FINDINGS_PAGE_SIZE = 6;
 
 function ReportModal({
   findings,
@@ -24,13 +24,16 @@ function ReportModal({
   onClose,
   onExport,
 }) {
-  const [findingsPage, setFindingsPage] = useState(1)
-  const findingsTotalPages = Math.max(1, Math.ceil(findings.length / FINDINGS_PAGE_SIZE))
-  const findingsStartIndex = (findingsPage - 1) * FINDINGS_PAGE_SIZE
+  const [findingsPage, setFindingsPage] = useState(1);
+  const findingsTotalPages = Math.max(
+    1,
+    Math.ceil(findings.length / FINDINGS_PAGE_SIZE),
+  );
+  const findingsStartIndex = (findingsPage - 1) * FINDINGS_PAGE_SIZE;
   const visibleFindings = findings.slice(
     findingsStartIndex,
-    findingsStartIndex + FINDINGS_PAGE_SIZE
-  )
+    findingsStartIndex + FINDINGS_PAGE_SIZE,
+  );
 
   return (
     <div
@@ -46,7 +49,9 @@ function ReportModal({
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Reports</p>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
+              Reports
+            </p>
             <h2 className="mt-1 font-display text-[1.3rem] font-semibold text-white">
               {context.title}
             </h2>
@@ -57,7 +62,7 @@ function ReportModal({
 
           <div className="flex items-center gap-2">
             <button
-              className="rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-[11px] text-cyan-200 transition hover:border-cyan-400/40 hover:text-white"
+              className="btn-secondary rounded-lg px-3 py-2 text-[11px]"
               onClick={onExport}
               type="button"
             >
@@ -67,7 +72,7 @@ function ReportModal({
               </span>
             </button>
             <button
-              className="rounded-lg border border-slate-800 bg-slate-950/70 p-2 text-slate-300 transition hover:text-white"
+              className="btn-secondary rounded-lg p-2 text-slate-300"
               onClick={onClose}
               type="button"
             >
@@ -81,13 +86,13 @@ function ReportModal({
           <div className="absolute bottom-0 left-12 h-24 w-24 rounded-full bg-rose-400/10 blur-3xl" />
           <div className="relative grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
             <div>
-              <p className="text-[10px] uppercase tracking-[0.22em] text-cyan-200/70">
+              <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">
                 Analyst Summary
               </p>
               <h3 className="mt-2 font-display text-[1.5rem] font-semibold leading-tight text-white">
                 {companyFocus
                   ? `${companyName} leak exposure snapshot`
-                  : 'Current leak exposure snapshot across monitored companies'}
+                  : "Current leak exposure snapshot across monitored companies"}
               </h3>
               <p className="mt-2 max-w-xl text-[12px] leading-6 text-slate-300">
                 {context.subtitle}
@@ -115,7 +120,7 @@ function ReportModal({
               </div>
               <div className="rounded-2xl border border-slate-700/70 bg-slate-950/45 px-3 py-2.5">
                 <p className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-slate-400">
-                  <Users className="h-3.5 w-3.5 text-cyan-300" />
+                  <Users className="h-3.5 w-3.5 text-slate-400" />
                   Scope
                 </p>
                 <p className="mt-1 text-[1.15rem] font-semibold text-white">
@@ -130,9 +135,14 @@ function ReportModal({
 
         <div className="mt-4 grid gap-3 xl:grid-cols-[0.88fr_1.12fr]">
           <div className="rounded-[18px] border border-slate-800 bg-slate-950/45 p-3.5">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Severity Distribution</p>
+            <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">
+              Severity Distribution
+            </p>
             <div className="mt-2 grid gap-2 xl:grid-cols-[160px_1fr] xl:items-center">
-              <SeverityDonutChart data={severityData} total={summary.totalFindings} />
+              <SeverityDonutChart
+                data={severityData}
+                total={summary.totalFindings}
+              />
               <div className="space-y-2">
                 {severityData.map((item) => (
                   <div
@@ -166,41 +176,54 @@ function ReportModal({
         <div className="mt-4 grid gap-3 xl:grid-cols-[0.95fr_1.05fr]">
           <div className="rounded-[18px] border border-slate-800 bg-slate-950/45 p-3.5">
             <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">
-              {companyFocus ? 'Company Focus' : 'Top Affected Companies'}
+              {companyFocus ? "Company Focus" : "Top Affected Companies"}
             </p>
             {companyFocus ? (
               <div className="mt-3 grid gap-2">
                 <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5">
-                  <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Highest Risk Score</p>
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                    Highest Risk Score
+                  </p>
                   <p className="mt-1 text-[1.15rem] font-semibold text-white">
                     {focusedCompanyInsights?.highestRisk ?? 0}
                   </p>
                 </div>
                 <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5">
-                  <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Active Sources</p>
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                    Active Sources
+                  </p>
                   <p className="mt-1 text-[1.15rem] font-semibold text-white">
                     {focusedCompanyInsights?.activeSources ?? 0}
                   </p>
                 </div>
                 <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5">
-                  <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Open Findings</p>
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                    Open Findings
+                  </p>
                   <p className="mt-1 text-[1.15rem] font-semibold text-white">
                     {focusedCompanyInsights?.openFindings ?? 0}
                   </p>
                 </div>
                 <div className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2.5">
-                  <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">Source Breakdown</p>
+                  <p className="text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                    Source Breakdown
+                  </p>
                   {sourceBreakdown.length > 0 ? (
                     <div className="mt-2 space-y-2">
                       {sourceBreakdown.map((item) => (
-                        <div className="flex items-center justify-between text-[11px]" key={item.label}>
+                        <div
+                          className="flex items-center justify-between text-[11px]"
+                          key={item.label}
+                        >
                           <span className="text-slate-300">{item.label}</span>
                           <span className="text-slate-100">{item.count}</span>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="mt-2 text-[11px] text-slate-400">No source data in the current filtered view.</p>
+                    <p className="mt-2 text-[11px] text-slate-400">
+                      No source data in the current filtered view.
+                    </p>
                   )}
                 </div>
               </div>
@@ -218,7 +241,7 @@ function ReportModal({
               </p>
               <p className="text-[10px] text-slate-500">
                 {findings.length === 0
-                  ? '0 results'
+                  ? "0 results"
                   : `${findingsStartIndex + 1}-${Math.min(findingsStartIndex + visibleFindings.length, findings.length)} of ${findings.length}`}
               </p>
             </div>
@@ -233,7 +256,9 @@ function ReportModal({
                       <p className="truncate text-[12px] font-medium text-white">
                         {finding.company}
                       </p>
-                      <p className="truncate text-[11px] text-slate-400">{finding.type}</p>
+                      <p className="truncate text-[11px] text-slate-400">
+                        {finding.type}
+                      </p>
                     </div>
                     <span className="shrink-0 text-[10px] text-slate-500">
                       {finding.detectedAt}
@@ -248,9 +273,11 @@ function ReportModal({
             {findingsTotalPages > 1 ? (
               <div className="mt-3 flex items-center justify-between gap-3">
                 <button
-                  className="rounded-md border border-slate-800 bg-slate-950/80 px-2.5 py-1 text-[11px] text-slate-300 disabled:opacity-40"
+                  className="btn-secondary rounded-md px-2.5 py-1 text-[11px] text-slate-300 disabled:opacity-40"
                   disabled={findingsPage === 1}
-                  onClick={() => setFindingsPage((current) => Math.max(1, current - 1))}
+                  onClick={() =>
+                    setFindingsPage((current) => Math.max(1, current - 1))
+                  }
                   type="button"
                 >
                   Previous
@@ -259,10 +286,12 @@ function ReportModal({
                   Page {findingsPage} / {findingsTotalPages}
                 </span>
                 <button
-                  className="rounded-md border border-slate-800 bg-slate-950/80 px-2.5 py-1 text-[11px] text-slate-300 disabled:opacity-40"
+                  className="btn-secondary rounded-md px-2.5 py-1 text-[11px] text-slate-300 disabled:opacity-40"
                   disabled={findingsPage === findingsTotalPages}
                   onClick={() =>
-                    setFindingsPage((current) => Math.min(findingsTotalPages, current + 1))
+                    setFindingsPage((current) =>
+                      Math.min(findingsTotalPages, current + 1),
+                    )
                   }
                   type="button"
                 >
@@ -274,7 +303,7 @@ function ReportModal({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default ReportModal
+export default ReportModal;

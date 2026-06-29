@@ -1,26 +1,19 @@
-import { startTransition, useEffect, useState } from 'react'
-import {
-  Activity,
-  BadgeCheck,
-  Building2,
-  ShieldAlert,
-} from 'lucide-react'
-import StatCard from '../components/cards/StatCard'
-import CompaniesBarChart from '../components/charts/CompaniesBarChart'
-import FindingsLineChart from '../components/charts/FindingsLineChart'
-import SeverityDonutChart from '../components/charts/SeverityDonutChart'
-import DataSourcesCard from '../components/dashboard/DataSourcesCard'
-import DetectionEngineStatus from '../components/dashboard/DetectionEngineStatus'
-import FindingDetailModal from '../components/dashboard/FindingDetailModal'
-import LatestCriticalAlerts from '../components/dashboard/LatestCriticalAlerts'
-import LiveMonitoringFeed from '../components/dashboard/LiveMonitoringFeed'
-import RecentFindings from '../components/dashboard/RecentFindings'
-import ReportModal from '../components/dashboard/ReportModal'
-import SeverityLegend from '../components/dashboard/SeverityLegend'
-import SourceManagementPanel from '../components/dashboard/SourceManagementPanel'
-import TimelineRangeSelector from '../components/dashboard/TimelineRangeSelector'
-import StatusCard from '../components/cards/StatusCard'
-import DashboardShell from '../components/layout/DashboardShell'
+import { startTransition, useEffect, useState } from "react";
+import { Activity, BadgeCheck, Building2, ShieldAlert } from "lucide-react";
+import StatCard from "../components/cards/StatCard";
+import CompaniesBarChart from "../components/charts/CompaniesBarChart";
+import FindingsLineChart from "../components/charts/FindingsLineChart";
+import SeverityDonutChart from "../components/charts/SeverityDonutChart";
+import DataSourcesCard from "../components/dashboard/DataSourcesCard";
+import FindingDetailModal from "../components/dashboard/FindingDetailModal";
+import LatestCriticalAlerts from "../components/dashboard/LatestCriticalAlerts";
+import RecentFindings from "../components/dashboard/RecentFindings";
+import ReportModal from "../components/dashboard/ReportModal";
+import SeverityLegend from "../components/dashboard/SeverityLegend";
+import SourceManagementModal from "../components/dashboard/SourceManagementModal";
+import TimelineRangeSelector from "../components/dashboard/TimelineRangeSelector";
+import StatusCard from "../components/cards/StatusCard";
+import DashboardShell from "../components/layout/DashboardShell";
 import {
   getCompanies,
   getDashboardBackendStats,
@@ -28,28 +21,29 @@ import {
   getFindingDetail,
   analyzeFindingWithLLM,
   updateFindingStatus,
-} from '../api/client'
-import { severityTheme } from '../styles/theme'
+} from "../api/client";
+import { normalizeSeverityLabel, severityTheme } from "../styles/theme";
 
-const ITEMS_PER_PAGE = 5
-const REFRESH_INTERVAL_MS = 30000
+const ITEMS_PER_PAGE = 5;
+const REFRESH_INTERVAL_MS = 30000;
 const TIMELINE_RANGE_LABELS = {
-  '7d': 'last 7 days',
-  '30d': 'last 30 days',
-  '365d': 'last 12 months',
-}
+  "7d": "last 7 days",
+  "30d": "last 30 days",
+  "365d": "last 12 months",
+};
 const TIMELINE_RANGE_DAYS = {
-  '7d': 7,
-  '30d': 30,
-  '365d': 365,
-}
+  "7d": 7,
+  "30d": 30,
+  "365d": 365,
+};
+const VISIBLE_SEVERITY_LEVELS = ["Critical", "Medium", "Low"];
 
 function normalizeSearchTerm(value) {
-  return value.trim().toLowerCase()
+  return value.trim().toLowerCase();
 }
 
 function findingMatchesSearch(finding, searchTerm) {
-  if (!searchTerm) return true
+  if (!searchTerm) return true;
 
   return [
     finding.company,
@@ -60,121 +54,130 @@ function findingMatchesSearch(finding, searchTerm) {
     finding.detectedAt,
     String(finding.riskScore),
   ]
-    .join(' ')
+    .join(" ")
     .toLowerCase()
-    .includes(searchTerm)
+    .includes(searchTerm);
 }
 
-
 function isResolvedStatus(status) {
-  return status === 'Reviewed' || status === 'False Positive'
+  return status === "Reviewed" || status === "False Positive";
 }
 
 function parseFindingDate(value) {
-  if (!value) return new Date(0)
+  if (!value) return new Date(0);
 
-  const normalizedValue = value.includes('T') ? value : value.replace(' ', 'T')
+  const normalizedValue = value.includes("T") ? value : value.replace(" ", "T");
   const withTimezone =
-    normalizedValue.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(normalizedValue)
+    normalizedValue.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(normalizedValue)
       ? normalizedValue
-      : `${normalizedValue}:00Z`
+      : `${normalizedValue}:00Z`;
 
-  const parsedDate = new Date(withTimezone)
-  return Number.isNaN(parsedDate.getTime()) ? new Date(0) : parsedDate
+  const parsedDate = new Date(withTimezone);
+  return Number.isNaN(parsedDate.getTime()) ? new Date(0) : parsedDate;
 }
 
 function buildTimelineFromFindings(findings, generatedAt, timelineRange) {
-  const baseDate = generatedAt ? new Date(generatedAt) : new Date()
-  const buckets = new Map()
+  const baseDate = generatedAt ? new Date(generatedAt) : new Date();
+  const buckets = new Map();
 
-  if (timelineRange === '365d') {
-    const currentMonth = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth(), 1))
+  if (timelineRange === "365d") {
+    const currentMonth = new Date(
+      Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth(), 1),
+    );
 
     for (let offset = 11; offset >= 0; offset -= 1) {
-      const current = new Date(currentMonth)
-      current.setUTCMonth(currentMonth.getUTCMonth() - offset)
-      const key = `${current.getUTCFullYear()}-${String(current.getUTCMonth() + 1).padStart(2, '0')}`
+      const current = new Date(currentMonth);
+      current.setUTCMonth(currentMonth.getUTCMonth() - offset);
+      const key = `${current.getUTCFullYear()}-${String(current.getUTCMonth() + 1).padStart(2, "0")}`;
       buckets.set(key, {
-        date: current.toLocaleDateString('en-GB', {
-          month: 'short',
-          year: 'numeric',
-          timeZone: 'UTC',
+        date: current.toLocaleDateString("en-GB", {
+          month: "short",
+          year: "numeric",
+          timeZone: "UTC",
         }),
         findings: 0,
-      })
+      });
     }
 
     findings.forEach((finding) => {
-      const findingDate = parseFindingDate(finding.detectedAt)
-      const key = `${findingDate.getUTCFullYear()}-${String(findingDate.getUTCMonth() + 1).padStart(2, '0')}`
+      const findingDate = parseFindingDate(finding.detectedAt);
+      const key = `${findingDate.getUTCFullYear()}-${String(findingDate.getUTCMonth() + 1).padStart(2, "0")}`;
       if (buckets.has(key)) {
-        buckets.get(key).findings += 1
+        buckets.get(key).findings += 1;
       }
-    })
+    });
 
-    return [...buckets.values()]
+    return [...buckets.values()];
   }
 
-  const totalDays = timelineRange === '30d' ? 30 : 7
+  const totalDays = timelineRange === "30d" ? 30 : 7;
   for (let offset = totalDays - 1; offset >= 0; offset -= 1) {
-    const current = new Date(baseDate)
-    current.setUTCDate(baseDate.getUTCDate() - offset)
-    const key = current.toISOString().slice(0, 10)
+    const current = new Date(baseDate);
+    current.setUTCDate(baseDate.getUTCDate() - offset);
+    const key = current.toISOString().slice(0, 10);
     buckets.set(key, {
-      date: current.toLocaleDateString('en-GB', {
-        month: 'short',
-        day: 'numeric',
-        timeZone: 'UTC',
+      date: current.toLocaleDateString("en-GB", {
+        month: "short",
+        day: "numeric",
+        timeZone: "UTC",
       }),
       findings: 0,
-    })
+    });
   }
 
   findings.forEach((finding) => {
-    const key = parseFindingDate(finding.detectedAt).toISOString().slice(0, 10)
+    const key = parseFindingDate(finding.detectedAt).toISOString().slice(0, 10);
     if (buckets.has(key)) {
-      buckets.get(key).findings += 1
+      buckets.get(key).findings += 1;
     }
-  })
+  });
 
-  return [...buckets.values()]
+  return [...buckets.values()];
 }
 
 function aggregateCompanies(findings) {
-  const groupedCompanies = new Map()
+  const groupedCompanies = new Map();
 
   findings.forEach((finding) => {
+    const normalizedSeverity = normalizeSeverityLabel(
+      finding.severity,
+      finding.riskScore,
+    );
     const existing = groupedCompanies.get(finding.company) ?? {
       name: finding.company,
       count: 0,
       score: 0,
-      color: severityTheme.Info.chart,
-    }
+      color: severityTheme.Medium.chart,
+    };
 
-    existing.count += 1
+    existing.count += 1;
     if (finding.riskScore > existing.score) {
-      existing.score = finding.riskScore
-      existing.color = severityTheme[finding.severity]?.chart ?? severityTheme.Info.chart
+      existing.score = finding.riskScore;
+      existing.color =
+        normalizedSeverity === "Critical"
+          ? severityTheme.Medium.chart
+          : (severityTheme[normalizedSeverity]?.chart ??
+            severityTheme.Medium.chart);
     }
 
-    groupedCompanies.set(finding.company, existing)
-  })
+    groupedCompanies.set(finding.company, existing);
+  });
 
   return [...groupedCompanies.values()]
     .sort((left, right) => {
-      if (right.count !== left.count) return right.count - left.count
-      return right.score - left.score
+      if (right.count !== left.count) return right.count - left.count;
+      return right.score - left.score;
     })
-    .slice(0, 10)
+    .slice(0, 10);
 }
 
 function mergeBackendStats(dashboardOverview, backendStats, companies) {
-  const summary = dashboardOverview.summary ?? {}
-  const statsOverview = backendStats.overview ?? {}
+  const summary = dashboardOverview.summary ?? {};
+  const statsOverview = backendStats.overview ?? {};
   const companyOptions = (companies ?? [])
     .map((company) => company.name)
     .filter(Boolean)
-    .sort((left, right) => left.localeCompare(right))
+    .sort((left, right) => left.localeCompare(right));
 
   return {
     ...dashboardOverview,
@@ -182,37 +185,50 @@ function mergeBackendStats(dashboardOverview, backendStats, companies) {
     company_options: companyOptions,
     summary: {
       ...summary,
-      total_findings: statsOverview.total_findings ?? summary.total_findings ?? 0,
-      critical_alerts: statsOverview.critical_alerts ?? summary.critical_alerts ?? 0,
-      reviewed_findings: statsOverview.reviewed_findings ?? summary.reviewed_findings ?? 0,
+      total_findings:
+        statsOverview.total_findings ?? summary.total_findings ?? 0,
+      critical_alerts:
+        statsOverview.critical_alerts ?? summary.critical_alerts ?? 0,
+      reviewed_findings:
+        statsOverview.reviewed_findings ?? summary.reviewed_findings ?? 0,
       monitored_companies:
-        statsOverview.monitored_companies ?? summary.monitored_companies ?? companyOptions.length,
+        statsOverview.monitored_companies ??
+        summary.monitored_companies ??
+        companyOptions.length,
       latest_collection:
-        statsOverview.latest_finding_at ?? summary.latest_collection ?? 'No scan data',
+        statsOverview.latest_finding_at ??
+        summary.latest_collection ??
+        "No scan data",
     },
     timeline:
       backendStats.findingsByDay?.length > 0
         ? backendStats.findingsByDay
         : dashboardOverview.timeline,
-  }
+  };
 }
 
 function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;')
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
-function exportDashboardReport({ findings, summary, severityData, generatedAt, context }) {
+function exportDashboardReport({
+  findings,
+  summary,
+  severityData,
+  generatedAt,
+  context,
+}) {
   const severityRows = severityData
     .map(
       (item) =>
-        `<tr><td>${escapeHtml(item.label)}</td><td style="text-align:right;">${escapeHtml(item.value)}</td></tr>`
+        `<tr><td>${escapeHtml(item.label)}</td><td style="text-align:right;">${escapeHtml(item.value)}</td></tr>`,
     )
-    .join('')
+    .join("");
 
   const findingRows = findings
     .map(
@@ -225,9 +241,9 @@ function exportDashboardReport({ findings, summary, severityData, generatedAt, c
           <td>${escapeHtml(finding.status)}</td>
           <td>${escapeHtml(finding.detectedAt)}</td>
         </tr>
-      `
+      `,
     )
-    .join('')
+    .join("");
 
   const printableHtml = `
     <html>
@@ -271,8 +287,9 @@ function exportDashboardReport({ findings, summary, severityData, generatedAt, c
           </div>
           <div>
             <h2>Findings</h2>
-            ${findingRows
-              ? `
+            ${
+              findingRows
+                ? `
                 <table>
                   <thead>
                     <tr>
@@ -287,487 +304,555 @@ function exportDashboardReport({ findings, summary, severityData, generatedAt, c
                   <tbody>${findingRows}</tbody>
                 </table>
               `
-              : '<p class="empty">No findings in the current report view.</p>'}
+                : '<p class="empty">No findings in the current report view.</p>'
+            }
           </div>
         </div>
       </body>
     </html>
-  `
+  `;
 
-  const printFrame = document.createElement('iframe')
-  printFrame.style.position = 'fixed'
-  printFrame.style.right = '0'
-  printFrame.style.bottom = '0'
-  printFrame.style.width = '0'
-  printFrame.style.height = '0'
-  printFrame.style.border = '0'
-  printFrame.setAttribute('aria-hidden', 'true')
-  document.body.appendChild(printFrame)
+  const printFrame = document.createElement("iframe");
+  printFrame.style.position = "fixed";
+  printFrame.style.right = "0";
+  printFrame.style.bottom = "0";
+  printFrame.style.width = "0";
+  printFrame.style.height = "0";
+  printFrame.style.border = "0";
+  printFrame.setAttribute("aria-hidden", "true");
+  document.body.appendChild(printFrame);
 
   const cleanup = () => {
     window.setTimeout(() => {
       if (printFrame.parentNode) {
-        printFrame.parentNode.removeChild(printFrame)
+        printFrame.parentNode.removeChild(printFrame);
       }
-    }, 300)
-  }
+    }, 300);
+  };
 
-  const frameDocument = printFrame.contentWindow?.document
+  const frameDocument = printFrame.contentWindow?.document;
   if (!frameDocument || !printFrame.contentWindow) {
-    cleanup()
-    return
+    cleanup();
+    return;
   }
 
-  frameDocument.open()
-  frameDocument.write(printableHtml)
-  frameDocument.close()
+  frameDocument.open();
+  frameDocument.write(printableHtml);
+  frameDocument.close();
 
   window.setTimeout(() => {
-    printFrame.contentWindow.focus()
-    printFrame.contentWindow.print()
-    cleanup()
-  }, 250)
+    printFrame.contentWindow.focus();
+    printFrame.contentWindow.print();
+    cleanup();
+  }, 250);
 }
 
 function Dashboard() {
-  const [activeItem, setActiveItem] = useState('dashboard')
-  const [timelineRange, setTimelineRange] = useState('7d')
-  const [searchValue, setSearchValue] = useState('')
-  const [companyFilter, setCompanyFilter] = useState('All Companies')
-  const [severityFilter, setSeverityFilter] = useState('All Severity')
-  const [statusFilter, setStatusFilter] = useState('All Status')
-  const [sortBy, setSortBy] = useState('score-desc')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [dashboardData, setDashboardData] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [loadError, setLoadError] = useState('')
-  const [selectedFindingId, setSelectedFindingId] = useState(null)
-  const [selectedFindingDetail, setSelectedFindingDetail] = useState(null)
-  const [isFindingDetailLoading, setIsFindingDetailLoading] = useState(false)
-  const [findingDetailError, setFindingDetailError] = useState('')
-  const [isUpdatingFindingStatus, setIsUpdatingFindingStatus] = useState(false)
-  const [isAnalyzingFindingWithLLM, setIsAnalyzingFindingWithLLM] = useState(false)
-  const [isReportOpen, setIsReportOpen] = useState(false)
+  const [activeItem, setActiveItem] = useState("dashboard");
+  const [timelineRange, setTimelineRange] = useState("7d");
+  const [searchValue, setSearchValue] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("All Companies");
+  const [severityFilter, setSeverityFilter] = useState("All Severity");
+  const [statusFilter, setStatusFilter] = useState("All Status");
+  const [sortBy, setSortBy] = useState("score-desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [selectedFindingId, setSelectedFindingId] = useState(null);
+  const [selectedFindingDetail, setSelectedFindingDetail] = useState(null);
+  const [isFindingDetailLoading, setIsFindingDetailLoading] = useState(false);
+  const [findingDetailError, setFindingDetailError] = useState("");
+  const [isUpdatingFindingStatus, setIsUpdatingFindingStatus] = useState(false);
+  const [isAnalyzingFindingWithLLM, setIsAnalyzingFindingWithLLM] =
+    useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isSourceManagementOpen, setIsSourceManagementOpen] = useState(false);
 
   useEffect(() => {
-    let isActive = true
+    let isActive = true;
 
     async function loadDashboard() {
-      setIsLoading(true)
-      setLoadError('')
+      setIsLoading(true);
+      setLoadError("");
 
       try {
         const [overview, backendStats, companies] = await Promise.all([
           getDashboardOverview(timelineRange),
           getDashboardBackendStats(TIMELINE_RANGE_DAYS[timelineRange] ?? 30),
           getCompanies(),
-        ])
-        if (!isActive) return
+        ]);
+        if (!isActive) return;
 
         startTransition(() => {
-          setDashboardData(mergeBackendStats(overview, backendStats, companies))
-        })
+          setDashboardData(
+            mergeBackendStats(overview, backendStats, companies),
+          );
+        });
       } catch (error) {
-        if (!isActive) return
-        setLoadError(error.message || 'Failed to load dashboard data.')
+        if (!isActive) return;
+        setLoadError(error.message || "Failed to load dashboard data.");
       } finally {
         if (isActive) {
-          setIsLoading(false)
+          setIsLoading(false);
         }
       }
     }
 
-    loadDashboard()
-    const intervalId = window.setInterval(loadDashboard, REFRESH_INTERVAL_MS)
+    loadDashboard();
+    const intervalId = window.setInterval(loadDashboard, REFRESH_INTERVAL_MS);
 
     return () => {
-      isActive = false
-      window.clearInterval(intervalId)
-    }
-  }, [timelineRange])
+      isActive = false;
+      window.clearInterval(intervalId);
+    };
+  }, [timelineRange]);
 
-  const findings = dashboardData?.findings ?? []
-  const timelineData = dashboardData?.timeline ?? []
-  const dataSources = dashboardData?.data_sources ?? []
-  const criticalAlertsData = dashboardData?.critical_alerts ?? []
-  const topCompaniesData = dashboardData?.top_companies ?? []
-  const severityBreakdown = dashboardData?.severity_breakdown ?? []
-  const severityLegend = dashboardData?.severity_legend ?? []
-  const sidebarStatusCards = dashboardData?.sidebar_status_cards ?? []
+  const findings = dashboardData?.findings ?? [];
+  const timelineData = dashboardData?.timeline ?? [];
+  const dataSources = dashboardData?.data_sources ?? [];
+  const criticalAlertsData = dashboardData?.critical_alerts ?? [];
+  const topCompaniesData = dashboardData?.top_companies ?? [];
+  const severityBreakdown = dashboardData?.severity_breakdown ?? [];
+  const severityLegend = dashboardData?.severity_legend ?? [];
   const detectionEngine = dashboardData?.detection_engine ?? {
-    model_status: 'Offline',
+    model_status: "Offline",
     analysis_coverage: 0,
     analyzed_findings: 0,
     pending_findings: 0,
-  }
+  };
   const summary = dashboardData?.summary ?? {
     total_findings: 0,
     critical_alerts: 0,
     reviewed_findings: 0,
     monitored_companies: 0,
-    latest_collection: 'No scan data',
-  }
+    latest_collection: "No scan data",
+  };
 
   const syncFindingAcrossDashboard = (updatedFinding) => {
     setDashboardData((currentData) => {
-      if (!currentData) return currentData
+      if (!currentData) return currentData;
 
       const previousFinding = (currentData.findings ?? []).find(
-        (finding) => finding.id === updatedFinding.id
-      )
+        (finding) => finding.id === updatedFinding.id,
+      );
       const nextFindings = (currentData.findings ?? []).map((finding) =>
-        finding.id === updatedFinding.id ? { ...finding, ...updatedFinding } : finding
-      )
+        finding.id === updatedFinding.id
+          ? { ...finding, ...updatedFinding }
+          : finding,
+      );
       const reviewedDelta =
         Number(isResolvedStatus(updatedFinding.status)) -
-        Number(isResolvedStatus(previousFinding?.status))
+        Number(isResolvedStatus(previousFinding?.status));
       const fallbackReviewedCount = nextFindings.filter((finding) =>
-        isResolvedStatus(finding.status)
-      ).length
+        isResolvedStatus(finding.status),
+      ).length;
 
       return {
         ...currentData,
         findings: nextFindings,
         critical_alerts: (currentData.critical_alerts ?? []).map((finding) =>
-          finding.id === updatedFinding.id ? { ...finding, ...updatedFinding } : finding
+          finding.id === updatedFinding.id
+            ? { ...finding, ...updatedFinding }
+            : finding,
         ),
         summary: {
           ...currentData.summary,
           reviewed_findings: Math.max(
             0,
-            (currentData.summary?.reviewed_findings ?? fallbackReviewedCount) + reviewedDelta
+            (currentData.summary?.reviewed_findings ?? fallbackReviewedCount) +
+              reviewedDelta,
           ),
         },
-      }
-    })
-  }
-  const normalizedSearchTerm = normalizeSearchTerm(searchValue)
-  const hasActiveSearch = normalizedSearchTerm.length > 0
-  const hasCompanyFocus = companyFilter !== 'All Companies'
+      };
+    });
+  };
+  const normalizedSearchTerm = normalizeSearchTerm(searchValue);
+  const hasActiveSearch = normalizedSearchTerm.length > 0;
+  const hasCompanyFocus = companyFilter !== "All Companies";
   const hasActiveFilterContext =
     hasActiveSearch ||
-    companyFilter !== 'All Companies' ||
-    severityFilter !== 'All Severity' ||
-    statusFilter !== 'All Status'
+    companyFilter !== "All Companies" ||
+    severityFilter !== "All Severity" ||
+    statusFilter !== "All Status";
 
   const companyOptions =
     dashboardData?.company_options?.length > 0
       ? dashboardData.company_options
-      : [...new Set(findings.map((finding) => finding.company))]
+      : [...new Set(findings.map((finding) => finding.company))];
 
   const filteredFindings = (() => {
     return findings.filter((finding) => {
-      const searchMatch = findingMatchesSearch(finding, normalizedSearchTerm)
+      const searchMatch = findingMatchesSearch(finding, normalizedSearchTerm);
       const companyMatch =
-        companyFilter === 'All Companies' || finding.company === companyFilter
+        companyFilter === "All Companies" || finding.company === companyFilter;
       const severityMatch =
-        severityFilter === 'All Severity' || finding.severity === severityFilter
-      const statusMatch = statusFilter === 'All Status' || finding.status === statusFilter
+        severityFilter === "All Severity" ||
+        finding.severity === severityFilter;
+      const statusMatch =
+        statusFilter === "All Status" || finding.status === statusFilter;
 
-      return searchMatch && companyMatch && severityMatch && statusMatch
-    })
-  })()
+      return searchMatch && companyMatch && severityMatch && statusMatch;
+    });
+  })();
 
   const sortedFindings = (() => {
-    const sorted = [...filteredFindings]
+    const sorted = [...filteredFindings];
 
     sorted.sort((left, right) => {
-      if (sortBy === 'score-desc') return right.riskScore - left.riskScore
-      if (sortBy === 'score-asc') return left.riskScore - right.riskScore
-      if (sortBy === 'newest') {
-        return parseFindingDate(right.detectedAt) - parseFindingDate(left.detectedAt)
+      if (sortBy === "score-desc") return right.riskScore - left.riskScore;
+      if (sortBy === "score-asc") return left.riskScore - right.riskScore;
+      if (sortBy === "newest") {
+        return (
+          parseFindingDate(right.detectedAt) - parseFindingDate(left.detectedAt)
+        );
       }
-      if (sortBy === 'oldest') {
-        return parseFindingDate(left.detectedAt) - parseFindingDate(right.detectedAt)
+      if (sortBy === "oldest") {
+        return (
+          parseFindingDate(left.detectedAt) - parseFindingDate(right.detectedAt)
+        );
       }
-      return 0
-    })
+      return 0;
+    });
 
-    return sorted
-  })()
+    return sorted;
+  })();
 
-  const totalPages = Math.max(1, Math.ceil(sortedFindings.length / ITEMS_PER_PAGE))
+  const totalPages = Math.max(
+    1,
+    Math.ceil(sortedFindings.length / ITEMS_PER_PAGE),
+  );
   const paginatedFindings = sortedFindings.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  )
+    currentPage * ITEMS_PER_PAGE,
+  );
 
   useEffect(() => {
-    setCurrentPage(1)
-  }, [companyFilter, severityFilter, statusFilter, sortBy])
+    setCurrentPage(1);
+  }, [companyFilter, severityFilter, statusFilter, sortBy]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
-      setCurrentPage(totalPages)
+      setCurrentPage(totalPages);
     }
-  }, [currentPage, totalPages])
+  }, [currentPage, totalPages]);
 
   const criticalAlerts = [...findings]
-    .filter((finding) => finding.severity === 'Critical' || finding.severity === 'High')
+    .filter((finding) => finding.severity === "Critical")
     .sort((left, right) => right.riskScore - left.riskScore)
-    .slice(0, 3)
-  const alertSource = criticalAlertsData.length > 0 ? criticalAlertsData : criticalAlerts
+    .slice(0, 3);
+  const criticalAlertsFromOverview = criticalAlertsData
+    .filter((finding) => finding.severity === "Critical")
+    .sort((left, right) => right.riskScore - left.riskScore)
+    .slice(0, 3);
+  const alertSource =
+    criticalAlertsFromOverview.length > 0
+      ? criticalAlertsFromOverview
+      : criticalAlerts;
+  const criticalAlertsCount = findings.filter(
+    (finding) => finding.severity === "Critical",
+  ).length;
   const visibleAlerts = alertSource.filter((alert) => {
-    const searchMatch = findingMatchesSearch(alert, normalizedSearchTerm)
-    const companyMatch = companyFilter === 'All Companies' || alert.company === companyFilter
-    const severityMatch = severityFilter === 'All Severity' || alert.severity === severityFilter
-    const statusMatch = statusFilter === 'All Status' || alert.status === statusFilter
-    return searchMatch && companyMatch && severityMatch && statusMatch
-  })
+    const searchMatch = findingMatchesSearch(alert, normalizedSearchTerm);
+    const companyMatch =
+      companyFilter === "All Companies" || alert.company === companyFilter;
+    const severityMatch =
+      severityFilter === "All Severity" || alert.severity === severityFilter;
+    const statusMatch =
+      statusFilter === "All Status" || alert.status === statusFilter;
+    return searchMatch && companyMatch && severityMatch && statusMatch;
+  });
 
   const visibleSummary = hasActiveFilterContext
     ? {
         total_findings: filteredFindings.length,
         critical_alerts: filteredFindings.filter(
-          (finding) => finding.severity === 'Critical' || finding.severity === 'High'
+          (finding) => finding.severity === "Critical",
         ).length,
         reviewed_findings: filteredFindings.filter((finding) =>
-          isResolvedStatus(finding.status)
+          isResolvedStatus(finding.status),
         ).length,
-        monitored_companies: new Set(filteredFindings.map((finding) => finding.company)).size,
+        monitored_companies: new Set(
+          filteredFindings.map((finding) => finding.company),
+        ).size,
         latest_collection: hasCompanyFocus
           ? `${companyFilter} filtered view`
           : hasActiveSearch
-          ? `Search results for "${searchValue.trim()}"`
-          : 'Filtered dashboard view',
+            ? `Search results for "${searchValue.trim()}"`
+            : "Filtered dashboard view",
       }
-    : summary
+    : {
+        ...summary,
+        critical_alerts: criticalAlertsCount,
+      };
 
   const visibleTimelineData = hasActiveFilterContext
-    ? buildTimelineFromFindings(filteredFindings, dashboardData?.generated_at, timelineRange)
-    : timelineData
+    ? buildTimelineFromFindings(
+        filteredFindings,
+        dashboardData?.generated_at,
+        timelineRange,
+      )
+    : timelineData;
 
   const severityData = (() => {
-    const counts = ['Critical', 'High', 'Medium', 'Low', 'Info'].map((label) => {
-      const serverValue = severityBreakdown.find((entry) => entry.label === label)?.value
-      const localValue = filteredFindings.filter((finding) => finding.severity === label).length
+    const counts = VISIBLE_SEVERITY_LEVELS.map((label) => {
+      const serverValue = severityBreakdown.find(
+        (entry) => entry.label === label,
+      )?.value;
+      const localValue = filteredFindings.filter(
+        (finding) => finding.severity === label,
+      ).length;
 
       return {
         label,
         value: hasActiveFilterContext
           ? localValue
-          : serverValue ?? localValue,
+          : (serverValue ?? localValue),
         color: severityTheme[label].chart,
-      }
-    })
+      };
+    });
 
-    return counts.filter((entry) => entry.value > 0)
-  })()
+    return counts.filter((entry) => entry.value > 0);
+  })();
 
   const topCompanies =
-    topCompaniesData.length > 0 && !hasActiveFilterContext
+    topCompaniesData.length > 0
       ? topCompaniesData.map((company) => ({
           name: company.name,
           count: company.count,
           score: company.score,
-          color: severityTheme[company.severity]?.chart ?? severityTheme.Info.chart,
+          color:
+            normalizeSeverityLabel(company.severity, company.score) ===
+            "Critical"
+              ? severityTheme.Medium.chart
+              : (severityTheme[
+                  normalizeSeverityLabel(company.severity, company.score)
+                ]?.chart ?? severityTheme.Medium.chart),
         }))
-      : aggregateCompanies(filteredFindings)
+      : aggregateCompanies(findings);
 
   const statCards = [
     {
       icon: Activity,
-      label: 'Total Findings',
+      label: "Total Findings",
       value: visibleSummary.total_findings,
-      detail: visibleSummary.latest_collection || 'No scan data',
-      accentClass: 'border-cyan-500/20',
-      color: '#38bdf8',
+      detail: "Active exposure inventory",
+      accentClass: "border-cyan-500/20",
+      color: "#6ea8d7",
       trend: [18, 24, 20, 30],
     },
     {
       icon: ShieldAlert,
-      label: 'Critical Alerts',
+      label: "Critical Alerts",
       value: visibleSummary.critical_alerts,
-      detail: 'Immediate review queue',
-      accentClass: 'border-rose-500/20',
-      color: '#fb7185',
+      detail: "Priority review queue",
+      accentClass: "border-rose-500/20",
+      color: "#d67a7a",
       trend: [12, 18, 16, 28],
     },
     {
       icon: BadgeCheck,
-      label: 'Reviewed',
+      label: "Reviewed",
       value: visibleSummary.reviewed_findings,
-      detail: 'Reviewed records',
-      accentClass: 'border-violet-500/20',
-      color: '#a78bfa',
+      detail: "Analyst-reviewed findings",
+      accentClass: "border-violet-500/20",
+      color: "#8e90c7",
       trend: [10, 12, 18, 22],
     },
     {
       icon: Building2,
-      label: 'Companies',
+      label: "Companies",
       value: visibleSummary.monitored_companies,
-      detail: 'Currently monitored',
-      accentClass: 'border-emerald-500/20',
-      color: '#4ade80',
+      detail: "Organizations in scope",
+      accentClass: "border-emerald-500/20",
+      color: "#69a98b",
       trend: [14, 18, 20, 26],
     },
-  ]
+  ];
 
   const scrollToSection = (sectionId) => {
-    const section = document.getElementById(sectionId)
+    const section = document.getElementById(sectionId);
     if (section) {
-      section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      section.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }
+  };
 
   const handleSelectItem = (itemId) => {
-    setActiveItem(itemId)
-    if (itemId === 'reports') {
-      setIsReportOpen(true)
-      return
+    setActiveItem(itemId);
+    if (itemId === "reports") {
+      setIsReportOpen(true);
+      return;
     }
-    scrollToSection(itemId)
-  }
+    if (itemId === "sources") {
+      setIsSourceManagementOpen(true);
+      return;
+    }
+    if (itemId === "companies") {
+      scrollToSection("top-companies-panel");
+      return;
+    }
+    scrollToSection(itemId);
+  };
 
   const handleViewAllAlerts = () => {
-    setSortBy('score-desc')
-    scrollToSection('findings')
-  }
+    setSortBy("score-desc");
+    scrollToSection("findings");
+  };
 
   const handlePageChange = (page) => {
-    if (page < 1 || page > totalPages) return
-    setCurrentPage(page)
-  }
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
 
   const handleSelectFinding = async (finding) => {
-    setSelectedFindingId(finding.id)
+    setSelectedFindingId(finding.id);
     setSelectedFindingDetail({
       ...finding,
       title: finding.type,
-      summary: 'Loading AI explanation...',
-      recommendedAction: 'Preparing recommended response...',
-      rawUrl: '',
-      publishedAt: '',
+      summary: "Loading AI explanation...",
+      recommendedAction: "Preparing recommended response...",
+      rawUrl: "",
+      publishedAt: "",
       evidence: [],
-    })
-    setFindingDetailError('')
-    setIsFindingDetailLoading(true)
+    });
+    setFindingDetailError("");
+    setIsFindingDetailLoading(true);
 
     try {
-      const detail = await getFindingDetail(finding.id)
-      setSelectedFindingDetail(detail)
+      const detail = await getFindingDetail(finding.id);
+      setSelectedFindingDetail(detail);
     } catch (error) {
-      setFindingDetailError(error.message || 'Failed to load finding detail.')
+      setFindingDetailError(error.message || "Failed to load finding detail.");
     } finally {
-      setIsFindingDetailLoading(false)
+      setIsFindingDetailLoading(false);
     }
-  }
+  };
 
   const handleCloseFindingDetail = () => {
-    setSelectedFindingId(null)
-    setSelectedFindingDetail(null)
-    setFindingDetailError('')
-    setIsFindingDetailLoading(false)
-    setIsUpdatingFindingStatus(false)
-    setIsAnalyzingFindingWithLLM(false)
-  }
+    setSelectedFindingId(null);
+    setSelectedFindingDetail(null);
+    setFindingDetailError("");
+    setIsFindingDetailLoading(false);
+    setIsUpdatingFindingStatus(false);
+    setIsAnalyzingFindingWithLLM(false);
+  };
 
   const handleUpdateFindingStatus = async (status) => {
-    if (!selectedFindingId) return
+    if (!selectedFindingId) return;
 
-    setIsUpdatingFindingStatus(true)
-    setFindingDetailError('')
+    setIsUpdatingFindingStatus(true);
+    setFindingDetailError("");
 
     try {
-      const updatedFinding = await updateFindingStatus(selectedFindingId, status)
-      setSelectedFindingDetail(updatedFinding)
-      syncFindingAcrossDashboard(updatedFinding)
+      const updatedFinding = await updateFindingStatus(
+        selectedFindingId,
+        status,
+      );
+      setSelectedFindingDetail(updatedFinding);
+      syncFindingAcrossDashboard(updatedFinding);
     } catch (error) {
-      setFindingDetailError(error.message || 'Failed to update finding status.')
+      setFindingDetailError(
+        error.message || "Failed to update finding status.",
+      );
     } finally {
-      setIsUpdatingFindingStatus(false)
+      setIsUpdatingFindingStatus(false);
     }
-  }
+  };
 
   const handleAnalyzeFindingWithLLM = async () => {
-    if (!selectedFindingId) return
+    if (!selectedFindingId) return;
 
-    setIsAnalyzingFindingWithLLM(true)
-    setFindingDetailError('')
+    setIsAnalyzingFindingWithLLM(true);
+    setFindingDetailError("");
 
     try {
-      const updatedFinding = await analyzeFindingWithLLM(selectedFindingId)
-      setSelectedFindingDetail(updatedFinding)
-      syncFindingAcrossDashboard(updatedFinding)
+      const updatedFinding = await analyzeFindingWithLLM(selectedFindingId);
+      setSelectedFindingDetail(updatedFinding);
+      syncFindingAcrossDashboard(updatedFinding);
     } catch (error) {
-      setFindingDetailError(error.message || 'Failed to run AI analysis.')
+      setFindingDetailError(error.message || "Failed to run AI analysis.");
     } finally {
-      setIsAnalyzingFindingWithLLM(false)
+      setIsAnalyzingFindingWithLLM(false);
     }
-  }
+  };
 
   const generatedLabel = dashboardData?.generated_at
-    ? new Date(dashboardData.generated_at).toLocaleString('en-GB', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
+    ? new Date(dashboardData.generated_at).toLocaleString("en-GB", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
       })
-    : summary.latest_collection || 'No scan data'
+    : summary.latest_collection || "No scan data";
 
-  const reportSeverityData = ['Critical', 'High', 'Medium', 'Low', 'Info']
-    .map((label) => ({
-      label,
-      value: sortedFindings.filter((finding) => finding.severity === label).length,
-      color: severityTheme[label].chart,
-    }))
-    .filter((entry) => entry.value > 0)
+  const reportSeverityData = VISIBLE_SEVERITY_LEVELS.map((label) => ({
+    label,
+    value: sortedFindings.filter((finding) => finding.severity === label)
+      .length,
+    color: severityTheme[label].chart,
+  })).filter((entry) => entry.value > 0);
 
   const reportSummary = {
     totalFindings: sortedFindings.length,
     criticalAlerts: sortedFindings.filter(
-      (finding) => finding.severity === 'Critical' || finding.severity === 'High'
+      (finding) => finding.severity === "Critical",
     ).length,
-    reviewedFindings: sortedFindings.filter((finding) => isResolvedStatus(finding.status)).length,
-    monitoredCompanies: new Set(sortedFindings.map((finding) => finding.company)).size,
-  }
+    reviewedFindings: sortedFindings.filter((finding) =>
+      isResolvedStatus(finding.status),
+    ).length,
+    monitoredCompanies: new Set(
+      sortedFindings.map((finding) => finding.company),
+    ).size,
+  };
   const reportTimelineData = buildTimelineFromFindings(
     sortedFindings,
     dashboardData?.generated_at,
-    timelineRange
-  )
-  const reportTopCompanies = aggregateCompanies(sortedFindings)
+    timelineRange,
+  );
+  const reportTopCompanies = aggregateCompanies(sortedFindings);
   const reportSourceBreakdown = Object.values(
     sortedFindings.reduce((accumulator, finding) => {
       if (!accumulator[finding.source]) {
         accumulator[finding.source] = {
           label: finding.source,
           count: 0,
-        }
+        };
       }
-      accumulator[finding.source].count += 1
-      return accumulator
-    }, {})
-  ).sort((left, right) => right.count - left.count)
+      accumulator[finding.source].count += 1;
+      return accumulator;
+    }, {}),
+  ).sort((left, right) => right.count - left.count);
 
   const focusedCompanyInsights = hasCompanyFocus
     ? {
         highestRisk: filteredFindings.reduce(
           (highest, finding) => Math.max(highest, finding.riskScore),
-          0
+          0,
         ),
-        activeSources: new Set(filteredFindings.map((finding) => finding.source)).size,
+        activeSources: new Set(
+          filteredFindings.map((finding) => finding.source),
+        ).size,
         openFindings: filteredFindings.filter(
-          (finding) => !isResolvedStatus(finding.status)
+          (finding) => !isResolvedStatus(finding.status),
         ).length,
       }
-    : null
+    : null;
   const reportContext = hasCompanyFocus
     ? {
         title: `${companyFilter} Exposure Report`,
         subtitle: `This report is focused on the currently filtered findings for ${companyFilter} and is suitable for a company-specific review or export.`,
       }
     : {
-        title: 'Leak Detection Report',
+        title: "Leak Detection Report",
         subtitle:
-          'This report condenses the current dashboard view into a printable analyst snapshot, including the visible findings list, severity split, and company pressure trend.',
-      }
+          "This report condenses the current dashboard view into a printable analyst snapshot, including the visible findings list, severity split, and company pressure trend.",
+      };
 
   const rightPanel = (
     <>
       <StatusCard
-        id="companies"
+        id="top-companies-panel"
         subtitle="Companies with the highest current leak pressure."
         title="Top Affected Companies"
       >
@@ -775,43 +860,35 @@ function Dashboard() {
       </StatusCard>
       <SeverityLegend items={severityLegend} />
       <DataSourcesCard items={dataSources} />
-      <DetectionEngineStatus
-        analysisCoverage={detectionEngine.analysis_coverage}
-        analyzedFindings={detectionEngine.analyzed_findings}
-        modelStatus={detectionEngine.model_status}
-        pendingFindings={detectionEngine.pending_findings}
-      />
     </>
-  )
+  );
 
   return (
     <DashboardShell
       activeItem={activeItem}
       onSearchChange={(value) => {
-        setSearchValue(value)
-        setCurrentPage(1)
+        setSearchValue(value);
+        setCurrentPage(1);
       }}
       onSelectItem={handleSelectItem}
+      detectionEngine={detectionEngine}
       rightPanel={rightPanel}
       searchValue={searchValue}
-      sidebarStatusCards={sidebarStatusCards}
     >
-      <section className="dashboard-fade flex items-center justify-between gap-3" id="dashboard">
-        <div>
-          <h1 className="section-title font-display text-[1.3rem] font-semibold tracking-tight text-white">
-            Dashboard
-          </h1>
-          <p className="mt-0.5 text-[11px] text-slate-400">
-            Real-time overview of detected leaks and exposures
-          </p>
-        </div>
+      <section
+        className="dashboard-fade flex items-center justify-end gap-3"
+        id="dashboard"
+      >
         <div className="hidden rounded-md border border-slate-800 bg-slate-950/60 px-2 py-1 text-[10px] text-slate-300 xl:block">
           {generatedLabel}
         </div>
       </section>
 
       {loadError ? (
-        <StatusCard subtitle="API connection" title="Dashboard Data Unavailable">
+        <StatusCard
+          subtitle="API connection"
+          title="Dashboard Data Unavailable"
+        >
           <p className="text-[11px] text-rose-300">
             {loadError}. Check the backend service and database connection.
           </p>
@@ -821,12 +898,16 @@ function Dashboard() {
       {isLoading ? (
         <StatusCard subtitle="Loading" title="Syncing Dashboard">
           <p className="text-[11px] text-slate-400">
-            Pulling live findings, metrics, and source activity from the backend.
+            Pulling live findings, metrics, and source activity from the
+            backend.
           </p>
         </StatusCard>
       ) : null}
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4" id="summary">
+      <section
+        className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
+        id="summary"
+      >
         {statCards.map((card, index) => (
           <StatCard
             accentClass={card.accentClass}
@@ -851,7 +932,7 @@ function Dashboard() {
       <RecentFindings
         actions={
           <button
-            className="rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-[10px] text-cyan-200 transition hover:border-cyan-400/40 hover:text-white"
+            className="btn-secondary rounded-lg px-2.5 py-1 text-[10px]"
             onClick={() => setIsReportOpen(true)}
             type="button"
           >
@@ -864,22 +945,22 @@ function Dashboard() {
         findings={paginatedFindings}
         itemsPerPage={ITEMS_PER_PAGE}
         onCompanyFilterChange={(value) => {
-          setCompanyFilter(value)
-          setCurrentPage(1)
+          setCompanyFilter(value);
+          setCurrentPage(1);
         }}
         onPageChange={handlePageChange}
         onSeverityFilterChange={(value) => {
-          setSeverityFilter(value)
-          setCurrentPage(1)
+          setSeverityFilter(value);
+          setCurrentPage(1);
         }}
         onSortByChange={(value) => {
-          setSortBy(value)
-          setCurrentPage(1)
+          setSortBy(value);
+          setCurrentPage(1);
         }}
         onSelectFinding={handleSelectFinding}
         onStatusFilterChange={(value) => {
-          setStatusFilter(value)
-          setCurrentPage(1)
+          setStatusFilter(value);
+          setCurrentPage(1);
         }}
         severityFilter={severityFilter}
         sortBy={sortBy}
@@ -887,8 +968,6 @@ function Dashboard() {
         totalResults={sortedFindings.length}
         totalPages={totalPages}
       />
-
-      <SourceManagementPanel />
 
       <section className="grid gap-3 xl:grid-cols-2" id="visualizations">
         <StatusCard
@@ -898,11 +977,18 @@ function Dashboard() {
           <div className="grid gap-2 xl:grid-cols-[132px_1fr] xl:items-center">
             <SeverityDonutChart
               data={severityData}
-              total={hasActiveFilterContext ? filteredFindings.length : visibleSummary.total_findings}
+              total={
+                hasActiveFilterContext
+                  ? filteredFindings.length
+                  : visibleSummary.total_findings
+              }
             />
             <div className="space-y-2">
               {severityData.map((item) => (
-                <div className="flex items-center justify-between gap-3 text-[12px]" key={item.label}>
+                <div
+                  className="flex items-center justify-between gap-3 text-[12px]"
+                  key={item.label}
+                >
                   <span className="flex items-center gap-3 text-slate-300">
                     <span
                       className="signal-dot h-2 w-2 rounded-full"
@@ -960,6 +1046,12 @@ function Dashboard() {
         />
       ) : null}
 
+      {isSourceManagementOpen ? (
+        <SourceManagementModal
+          onClose={() => setIsSourceManagementOpen(false)}
+        />
+      ) : null}
+
       {selectedFindingId ? (
         <FindingDetailModal
           error={findingDetailError}
@@ -973,7 +1065,7 @@ function Dashboard() {
         />
       ) : null}
     </DashboardShell>
-  )
+  );
 }
 
-export default Dashboard
+export default Dashboard;

@@ -1,7 +1,10 @@
 function Sparkline({ color, points }) {
   const path = points
-    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${index * 18} ${38 - point}`)
-    .join(' ')
+    .map(
+      (point, index) =>
+        `${index === 0 ? "M" : "L"} ${index * 18} ${38 - point}`,
+    )
+    .join(" ");
 
   return (
     <svg className="h-8 w-20" viewBox="0 0 72 40" fill="none">
@@ -13,33 +16,66 @@ function Sparkline({ color, points }) {
         stroke="none"
       />
     </svg>
-  )
+  );
 }
 
-function StatCard({ icon: Icon, label, value, detail, accentClass, color, trend, delay }) {
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  detail,
+  accentClass,
+  color,
+  trend,
+  delay,
+}) {
   return (
     <div
       className={`dashboard-fade rounded-lg-card px-3 py-2.5 ${accentClass}`}
-      style={{ animationDelay: delay, backgroundColor: 'var(--lg-card, #0c1114)' }}
+      style={{
+        animationDelay: delay,
+        backgroundColor: "var(--lg-card, #12191e)",
+      }}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="mb-1.5 flex h-7 w-7 items-center justify-center rounded-md border border-white/8 bg-white/3">
+          <div
+            className="mb-1.5 flex h-7 w-7 items-center justify-center rounded-md"
+            style={{
+              border: "1px solid var(--lg-control-border)",
+              background: "var(--lg-control-bg)",
+            }}
+          >
             <Icon className="h-3.5 w-3.5" style={{ color }} />
           </div>
-          <p className="truncate text-[11px] text-lg-muted">{label}</p>
-          <p className="font-display mt-0.5 text-[1.35rem] font-semibold tracking-tight text-lg-text">
+          <p className="text-[10px] font-medium tracking-[0.01em] text-lg-muted">
+            {label}
+          </p>
+          <p className="font-display mt-1 text-[1.18rem] font-semibold tracking-tight text-lg-text">
             {value}
           </p>
-          <p className="truncate text-[10px] text-lg-muted">{detail}</p>
+          {detail ? (
+            <p
+              className="mt-1 max-w-[112px] text-[8px] leading-3 text-lg-muted"
+              style={{ opacity: 0.72, letterSpacing: "0.01em" }}
+            >
+              {detail}
+            </p>
+          ) : null}
         </div>
 
-        <div className="rounded-md border border-white/5 bg-[rgba(255,255,255,0.02)] px-1 py-0.5">
+        <div
+          className="rounded-md px-1 py-0.5"
+          style={{
+            border: "1px solid var(--lg-control-border)",
+            background: "var(--lg-control-bg)",
+          }}
+        >
           <Sparkline color={color} points={trend} />
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default StatCard
+export default StatCard;

@@ -1,10 +1,25 @@
-function StatusCard({ title, subtitle, actionLabel, onAction, actions, children, live, id }) {
+function StatusCard({
+  title,
+  subtitle,
+  actionLabel,
+  onAction,
+  actions,
+  children,
+  live,
+  id,
+}) {
   return (
-    <section className="panel-surface rounded-[13px] p-2.5 dashboard-fade-slow" id={id}>
-      <div className="mb-2 flex items-start justify-between gap-2">
+    <section
+      className="panel-surface rounded-[13px] p-3 dashboard-fade-slow"
+      id={id}
+    >
+      <div className="mb-2.5 flex items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="section-title font-display text-[0.92rem] font-semibold text-white">
+            <h3
+              className="section-title font-display text-[0.9rem] font-semibold"
+              style={{ color: "var(--lg-text)" }}
+            >
               {title}
             </h3>
             {live ? (
@@ -14,14 +29,18 @@ function StatusCard({ title, subtitle, actionLabel, onAction, actions, children,
               </span>
             ) : null}
           </div>
-          {subtitle ? <p className="mt-0.5 text-[11px] text-slate-400">{subtitle}</p> : null}
+          {subtitle ? (
+            <p className="mt-1 text-[10px] leading-4 text-slate-400">
+              {subtitle}
+            </p>
+          ) : null}
         </div>
 
         {actions ? (
           <div className="flex items-center gap-2">{actions}</div>
         ) : actionLabel ? (
           <button
-            className="rounded-lg border border-slate-700 bg-slate-950/60 px-2.5 py-1 text-[10px] text-slate-200 transition hover:border-indigo-400/30 hover:text-white"
+            className="btn-secondary rounded-lg px-2.5 py-1 text-[10px]"
             onClick={onAction}
             type="button"
           >
@@ -32,7 +51,7 @@ function StatusCard({ title, subtitle, actionLabel, onAction, actions, children,
 
       {children}
     </section>
-  )
+  );
 }
 
-export default StatusCard
+export default StatusCard;

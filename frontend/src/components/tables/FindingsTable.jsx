@@ -1,5 +1,5 @@
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { getSeverityTheme, getStatusTheme } from '../../styles/theme'
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { getSeverityTheme, getStatusTheme } from "../../styles/theme";
 
 function FindingsTable({
   findings,
@@ -20,12 +20,12 @@ function FindingsTable({
   onSelectFinding,
 }) {
   const filterClassName =
-    'rounded-lg border border-slate-800 bg-[#050913] px-2.5 py-1.5 text-[11px] text-slate-300 outline-none appearance-none'
+    "control-field min-w-[124px] rounded-lg px-2.5 py-2 text-[10.5px] leading-none";
 
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-col gap-1.5 sm:flex-row">
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap">
           <select
             className={filterClassName}
             onChange={(event) => onCompanyFilterChange(event.target.value)}
@@ -46,7 +46,6 @@ function FindingsTable({
           >
             <option value="All Severity">All Severity</option>
             <option value="Critical">Critical</option>
-            <option value="High">High</option>
             <option value="Medium">Medium</option>
             <option value="Low">Low</option>
           </select>
@@ -78,20 +77,22 @@ function FindingsTable({
 
       <div className="space-y-2 md:hidden">
         {findings.length === 0 ? (
-          <div className="rounded-[11px] border border-slate-800/80 bg-[#040913] px-3 py-6 text-center text-[11px] text-slate-400">
-            No findings matched the current search and filters.
+          <div className="surface-subtle rounded-[11px] border border-slate-800/80 px-3 py-6 text-center text-[11px] text-slate-400">
+            No findings match the current filters.
           </div>
         ) : null}
 
         {findings.map((finding) => {
-          const severityTone = getSeverityTheme(finding.severity)
-          const statusTone = getStatusTheme(finding.status)
+          const severityTone = getSeverityTheme(finding.severity);
+          const statusTone = getStatusTheme(finding.status);
 
           return (
             <button
-              className="w-full rounded-[11px] border border-slate-800/80 bg-[#040913] p-3 text-left transition hover:border-slate-700"
+              className="surface-subtle w-full rounded-[11px] border border-slate-800/80 p-3 text-left transition hover:border-slate-700"
               key={finding.id}
-              onClick={onSelectFinding ? () => onSelectFinding(finding) : undefined}
+              onClick={
+                onSelectFinding ? () => onSelectFinding(finding) : undefined
+              }
               type="button"
             >
               <div className="flex items-start justify-between gap-3">
@@ -99,7 +100,9 @@ function FindingsTable({
                   <p className="truncate text-[12px] font-medium text-slate-100">
                     {finding.company}
                   </p>
-                  <p className="mt-0.5 truncate text-[11px] text-slate-400">{finding.type}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-slate-400">
+                    {finding.type}
+                  </p>
                 </div>
                 <span
                   className={`inline-flex min-w-10 justify-center rounded-md px-2 py-0.5 text-[10px] font-semibold ${severityTone.score}`}
@@ -121,63 +124,76 @@ function FindingsTable({
                 </span>
               </div>
 
-              <p className="mt-3 text-[10px] text-slate-500">{finding.detectedAt}</p>
+              <p className="mt-3 text-[10px] text-slate-500">
+                {finding.detectedAt}
+              </p>
             </button>
-          )
+          );
         })}
       </div>
 
-      <div className="hidden overflow-x-auto rounded-[11px] border border-slate-800/80 bg-[#040913] md:block">
+      <div className="surface-subtle hidden overflow-x-auto rounded-[12px] border border-slate-800/80 md:block">
         <table className="min-w-full divide-y divide-slate-800 text-left">
-          <thead>
-            <tr className="text-[10px] uppercase tracking-[0.18em] text-slate-500">
-              <th className="px-3 py-2 font-medium">Company</th>
-              <th className="px-3 py-2 font-medium">Type</th>
-              <th className="px-3 py-2 font-medium">Severity</th>
-              <th className="px-3 py-2 font-medium">Risk Score</th>
-              <th className="px-3 py-2 font-medium">Detected At</th>
-              <th className="px-3 py-2 font-medium">Status</th>
+          <thead style={{ background: "var(--lg-control-bg)" }}>
+            <tr className="text-[9px] uppercase tracking-[0.18em] text-slate-500">
+              <th className="px-3 py-2.5 font-medium">Company</th>
+              <th className="px-3 py-2.5 font-medium">Type</th>
+              <th className="px-3 py-2.5 font-medium">Severity</th>
+              <th className="px-3 py-2.5 font-medium">Risk Score</th>
+              <th className="px-3 py-2.5 font-medium">Detected At</th>
+              <th className="px-3 py-2.5 font-medium">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/90">
             {findings.length === 0 ? (
               <tr>
-                <td className="px-3 py-6 text-center text-[11px] text-slate-400" colSpan="6">
-                  No findings matched the current search and filters.
+                <td
+                  className="px-3 py-6 text-center text-[11px] text-slate-400"
+                  colSpan="6"
+                >
+                  No findings match the current filters.
                 </td>
               </tr>
             ) : null}
 
             {findings.map((finding) => {
-              const severityTone = getSeverityTheme(finding.severity)
-              const statusTone = getStatusTheme(finding.status)
+              const severityTone = getSeverityTheme(finding.severity);
+              const statusTone = getStatusTheme(finding.status);
 
               return (
                 <tr
-                  className={`data-row ${onSelectFinding ? 'cursor-pointer' : ''}`}
+                  className={`data-row ${onSelectFinding ? "cursor-pointer" : ""}`}
                   key={finding.id}
-                  onClick={onSelectFinding ? () => onSelectFinding(finding) : undefined}
+                  onClick={
+                    onSelectFinding ? () => onSelectFinding(finding) : undefined
+                  }
                 >
-                  <td className="px-3 py-2.5">
-                    <div className="font-medium text-[11px] text-slate-100">{finding.company}</div>
+                  <td className="px-3 py-3">
+                    <div className="font-medium text-[11px] text-slate-100">
+                      {finding.company}
+                    </div>
                   </td>
-                  <td className="px-3 py-2.5 text-[11px] text-slate-300">{finding.type}</td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-3 text-[11px] text-slate-300">
+                    {finding.type}
+                  </td>
+                  <td className="px-3 py-3">
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${severityTone.badge}`}
                     >
                       {finding.severity}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-3">
                     <span
                       className={`inline-flex min-w-10 justify-center rounded-md px-2 py-0.5 text-[10px] font-semibold ${severityTone.score}`}
                     >
                       {finding.riskScore}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5 text-[10px] text-slate-400">{finding.detectedAt}</td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-3 text-[10px] text-slate-400">
+                    {finding.detectedAt}
+                  </td>
+                  <td className="px-3 py-3">
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${statusTone}`}
                     >
@@ -185,33 +201,35 @@ function FindingsTable({
                     </span>
                   </td>
                 </tr>
-              )
+              );
             })}
           </tbody>
         </table>
       </div>
 
-      <div className="flex flex-col gap-2 text-[11px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 text-[10.5px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
         <p className="leading-5">
-          Showing {findings.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to{' '}
-          {(currentPage - 1) * itemsPerPage + findings.length} of {totalResults} results
-          {totalPages > 0 ? ` • Page ${currentPage} of ${totalPages}` : ''}
+          Showing{" "}
+          {findings.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to{" "}
+          {(currentPage - 1) * itemsPerPage + findings.length} of {totalResults}{" "}
+          results
+          {totalPages > 0 ? ` • Page ${currentPage} of ${totalPages}` : ""}
         </p>
 
         <div className="flex items-center gap-2">
           <button
-            className="rounded-md border border-slate-800 bg-slate-950/80 p-1.5 text-slate-300 disabled:opacity-40"
+            className="btn-secondary rounded-md p-1.5 text-slate-300 disabled:opacity-40"
             disabled={currentPage === 1}
             onClick={() => onPageChange(currentPage - 1)}
             type="button"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="rounded-md border border-slate-700 bg-[#060b18] px-2.5 py-1 text-slate-200">
+          <span className="surface-elevated rounded-md border border-slate-700 px-2.5 py-1 text-[10.5px] font-medium text-slate-200">
             {currentPage}
           </span>
           <button
-            className="rounded-md border border-slate-800 bg-slate-950/80 p-1.5 text-slate-300 disabled:opacity-40"
+            className="btn-secondary rounded-md p-1.5 text-slate-300 disabled:opacity-40"
             disabled={currentPage === totalPages || totalPages === 0}
             onClick={() => onPageChange(currentPage + 1)}
             type="button"
@@ -221,7 +239,7 @@ function FindingsTable({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default FindingsTable
+export default FindingsTable;

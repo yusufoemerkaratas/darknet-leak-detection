@@ -1,57 +1,62 @@
 import {
-  Area,
-  AreaChart,
   CartesianGrid,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
-} from 'recharts'
+} from "recharts";
 
 function FindingsLineChart({ data }) {
   return (
     <div className="h-36">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 12, right: 0, left: -18, bottom: 0 }}>
-          <defs>
-            <linearGradient id="findingsGlow" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="#fb7185" stopOpacity={0.4} />
-              <stop offset="100%" stopColor="#fb7185" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid stroke="rgba(148, 163, 184, 0.08)" vertical={false} />
+        <LineChart
+          data={data}
+          margin={{ top: 12, right: 0, left: -18, bottom: 0 }}
+        >
+          <CartesianGrid stroke="var(--lg-chart-grid)" vertical={false} />
           <XAxis
             axisLine={false}
             dataKey="date"
             interval="preserveStartEnd"
             minTickGap={16}
-            tick={{ fill: '#94a3b8', fontSize: 10 }}
+            tick={{ fill: "var(--lg-chart-label)", fontSize: 10 }}
             tickLine={false}
           />
           <YAxis
             axisLine={false}
-            tick={{ fill: '#94a3b8', fontSize: 10 }}
+            tick={{ fill: "var(--lg-chart-label)", fontSize: 10 }}
             tickLine={false}
           />
           <Tooltip
             contentStyle={{
-              background: 'rgba(6, 11, 29, 0.96)',
-              border: '1px solid rgba(71, 85, 105, 0.45)',
-              borderRadius: '16px',
-              color: '#e2e8f0',
+              background: "var(--lg-surface-elevated)",
+              border: "1px solid var(--lg-control-border)",
+              borderRadius: "14px",
+              color: "var(--lg-text)",
+              boxShadow: "0 12px 24px rgba(32, 43, 56, 0.1)",
             }}
           />
-          <Area
+          <Line
+            activeDot={{
+              fill: "var(--lg-chart-line)",
+              r: 3.5,
+              stroke: "var(--lg-surface-elevated)",
+              strokeWidth: 2,
+            }}
             dataKey="findings"
-            fill="url(#findingsGlow)"
-            stroke="#fb7185"
-            strokeWidth={2.5}
+            dot={false}
+            fill="none"
+            stroke="var(--lg-chart-line)"
+            strokeWidth={2.25}
             type="monotone"
           />
-        </AreaChart>
+        </LineChart>
       </ResponsiveContainer>
     </div>
-  )
+  );
 }
 
-export default FindingsLineChart
+export default FindingsLineChart;
