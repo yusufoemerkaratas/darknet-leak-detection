@@ -67,7 +67,7 @@ forums:
   # ------------------------------------------------------------------
   - id: breachforums
     name: "BreachForums"
-    enabled: true
+    enabled: false  # .onion address unreachable
     base_url: "http://breachforums3bc7dsc3wfp34dzjzlecsogfstfytndkpjqmam45gb5jyd.onion"
     clearnet_url: "https://breachforums.st"
 
@@ -151,7 +151,7 @@ forums:
 
   - id: xss_forum
     name: "XSS.is"
-    enabled: true
+    enabled: false  # .onion address unreachable
     base_url: "http://xssforumv3isucukbxhdhwz67hoa5e2voakcfkuieq4ch257vsburuid.onion"
     clearnet_url: "https://xss.is"
 
@@ -250,7 +250,7 @@ forums:
 
   - id: cracked_io
     name: "Cracked.io"
-    enabled: true
+    enabled: false  # clearnet routes through Tor, host unreachable
     base_url: "https://cracked.io"
     clearnet_url: "https://cracked.io"
 
@@ -264,7 +264,7 @@ forums:
       success_indicator: "Logout"
 
     account_generation:
-      enabled: false # Cloudflare koruması nedeniyle manuel hesap daha güvenli
+      enabled: false # Cloudflare protection — manual account safer than auto-register
 
     sections:
       - name: "Leaks Center"
@@ -285,16 +285,16 @@ forums:
 
     rate_limit:
       min_delay: 5.0
-      max_delay: 15.0 # Clearnet'te Cloudflare daha katıdır, yavaş olmalı
+      max_delay: 15.0 # Clearnet with Cloudflare — keep requests slow
 
   
   - id: wilders_security
     name: "Wilders Security"
-    enabled: true
+    enabled: false  # 403 Forbidden — bot protection active
     base_url: "https://www.wilderssecurity.com"
 
     auth:
-      type: none # Haber takibi için login gerekmiyor, sunumda hata riskini sıfırlar
+      type: none # News monitoring — no login required
 
     sections:
       - name: "Privacy & Data Protection"
@@ -318,7 +318,7 @@ forums:
 
   - id: exploit_in
     name: "Exploit.in"
-    enabled: true
+    enabled: false  # Invite-only + .onion address unreachable
     base_url: "http://exploitivzcm5dawzhe6c32f3zamswkpbu2vu3szfk2dcoq4qms2oad.onion"
     clearnet_url: "https://exploit.in"
 

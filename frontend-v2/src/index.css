@@ -1,0 +1,232 @@
+@import "tailwindcss";
+
+/* CSS variables for theming */
+:root {
+  --bg: #f4f6fb;
+  --surface: #eef1f8;
+  --card: #ffffff;
+  --border: #ccd6e8;
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --success: #16a34a;
+  --warning: #d97706;
+  --sidebar-w: 240px;
+  --glass: rgba(255, 255, 255, 0.90);
+  --glass-border: rgba(180, 200, 235, 0.30);
+}
+
+.dark {
+  --bg: #04050a;
+  --surface: #080c14;
+  --card: #0c1219;
+  --border: #152030;
+  --text: #e2e8f0;
+  --text-muted: #7a93a8;
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+  --danger: #ef4444;
+  --danger-hover: #f87171;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --glass: rgba(12, 18, 25, 0.75);
+  --glass-border: rgba(30, 50, 72, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+
+/* Page transition */
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter {
+  animation: pageEnter 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Global smooth transitions for all interactive elements */
+button,
+a,
+[role="button"],
+select,
+input,
+textarea,
+label[for],
+nav a {
+  transition-property: color, background-color, border-color, fill, stroke, opacity, box-shadow, outline-color;
+  transition-duration: 200ms;
+  transition-timing-function: ease-in-out;
+}
+
+/* ── Aurora blobs ── */
+.aurora-blob {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.aurora-1 { width: 55vw; height: 55vw; top: -20%;  right: -15%; animation: auroraFloat 24s ease-in-out infinite alternate; }
+.aurora-2 { width: 55vw; height: 55vw; bottom: -20%; left: -15%; animation: auroraFloat 24s ease-in-out infinite alternate-reverse; }
+.aurora-3 { width: 38vw; height: 38vw; top: -10%;  left: -10%;  animation: auroraFloat 32s ease-in-out infinite alternate; }
+.aurora-4 { width: 38vw; height: 38vw; bottom: -10%; right: -10%; animation: auroraFloat 32s ease-in-out infinite alternate-reverse; }
+
+/* dark mode — deep petrol/navy */
+.dark .aurora-1 { background: radial-gradient(circle, rgba(16,100,138,0.70) 0%, rgba(8,55,85,0.28) 45%, transparent 70%); filter: blur(65px); }
+.dark .aurora-2 { background: radial-gradient(circle, rgba(8,48,82,0.68)    0%, rgba(4,25,48,0.25) 45%, transparent 70%); filter: blur(75px); }
+.dark .aurora-3 { background: radial-gradient(circle, rgba(10,68,100,0.55)  0%, rgba(5,35,60,0.20) 45%, transparent 70%); filter: blur(70px); }
+.dark .aurora-4 { background: radial-gradient(circle, rgba(6,38,65,0.55)    0%, rgba(3,18,38,0.20) 45%, transparent 70%); filter: blur(60px); }
+
+/* light mode — soft pastel blue/violet */
+:root:not(.dark) .aurora-1 { background: radial-gradient(circle, rgba(99,179,237,0.22)  0%, rgba(147,210,255,0.08) 45%, transparent 70%); filter: blur(80px); }
+:root:not(.dark) .aurora-2 { background: radial-gradient(circle, rgba(129,140,248,0.18) 0%, rgba(165,180,252,0.07) 45%, transparent 70%); filter: blur(90px); }
+:root:not(.dark) .aurora-3 { background: radial-gradient(circle, rgba(56,189,248,0.15)  0%, rgba(125,211,252,0.06) 45%, transparent 70%); filter: blur(85px); }
+:root:not(.dark) .aurora-4 { background: radial-gradient(circle, rgba(165,180,252,0.14) 0%, rgba(196,181,253,0.05) 45%, transparent 70%); filter: blur(80px); }
+
+@keyframes auroraFloat {
+  0%   { transform: translate(0,     0)     scale(1);    }
+  33%  { transform: translate(35px,  45px)  scale(1.06); }
+  66%  { transform: translate(-25px, 30px)  scale(0.96); }
+  100% { transform: translate(20px,  -35px) scale(1.04); }
+}
+
+/* ── Badge colors ── */
+[class^="badge-"] {
+  background-color: var(--badge-bg-light);
+  color: var(--badge-color-light);
+}
+.dark [class^="badge-"] {
+  background-color: var(--badge-bg-dark);
+  color: var(--badge-color-dark);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ── Print styles ── */
+@media print {
+  /* Always print with light-mode colors regardless of active theme */
+  :root,
+  .dark {
+    --bg: #ffffff;
+    --surface: #f8fafc;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --primary: #1d4ed8;
+    --danger: #dc2626;
+    --success: #16a34a;
+    --warning: #d97706;
+    --glass: #ffffff;
+    --glass-border: #e2e8f0;
+  }
+
+  /* Allow content to flow across print pages */
+  html,
+  body,
+  #root {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: white !important;
+    color: #0f172a !important;
+  }
+
+  /* Hide chrome: sidebar, topbar, animated background */
+  aside,
+  header,
+  [aria-hidden="true"] {
+    display: none !important;
+  }
+
+  /* Remove sidebar margin so content fills the page */
+  aside ~ div {
+    margin-left: 0 !important;
+    height: auto !important;
+  }
+
+  /* Let the scrollable main area expand to full content height */
+  main {
+    overflow: visible !important;
+    height: auto !important;
+    flex: none !important;
+  }
+
+  /* Kill animations and visual effects */
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Hide interactive-only controls: filter tabs, pagination, action buttons */
+  button,
+  [role="button"] {
+    display: none !important;
+  }
+
+  /* Keep content blocks together across pages */
+  [class*="rounded-lg"],
+  tr {
+    break-inside: avoid;
+  }
+
+  /* Table borders for readability */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  th,
+  td {
+    border: 1px solid #e2e8f0;
+    padding: 4px 8px;
+  }
+}
